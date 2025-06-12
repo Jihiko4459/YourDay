@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">YourDay</string>
+    <string name="title_activity_registration">RegistrationActivity</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="title_activity_login">LoginActivity</string>
+    <string name="title_activity_otpverification">OTPVerificationActivity</string>
+    <string name="title_activity_last_step_to_registration">LastStepToRegistration</string>
 </resources>

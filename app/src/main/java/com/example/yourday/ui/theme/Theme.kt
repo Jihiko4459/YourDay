@@ -47,3 +47,12 @@ fun YourDayTheme(
         content = content
     )
 }
+
+@Composable
+fun GetIsDarkTheme(
+    darkTheme: Boolean = isSystemInDarkTheme()
+): Boolean {
+    val isDark = darkTheme
+
+    return isDark
+}

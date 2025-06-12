@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization) // Добавьте плагин для Kotlin Serialization
+
 }
 
 android {
@@ -41,8 +43,27 @@ android {
 
 dependencies {
 
+
+
+    implementation("co.touchlab:kermit-android-debug:2.0.3")
+
+
+    // Supabase (используйте одинаковые версии для всех модулей!)
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.1")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.1")
+    implementation("io.github.jan-tennert.supabase:storage-kt:2.2.1") // Обновите до той же версии
+    implementation("io.github.jan-tennert.supabase:realtime-kt:2.2.1") // Опционально, для realtime-функций
+    implementation("io.ktor:ktor-client-okhttp:2.3.7") // HTTP-клиент (совместим с 2.2.1)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0") // Для сериализации
+
+
+    implementation("androidx.preference:preference-ktx:1.2.1")
+
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+
+    implementation("androidx.activity:activity-compose:1.7.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -52,6 +73,10 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
