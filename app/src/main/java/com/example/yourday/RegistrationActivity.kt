@@ -160,17 +160,6 @@ class RegistrationActivity : ComponentActivity() {
         Log.e("REGISTRATION", "Error details", error)
     }
 
-    private fun intentToLastStepToRegistration() {
-        // Отправка данных
-        val intent = Intent(this, LastStepToRegistrationActivity::class.java).apply {
-            putExtra("KEY_STRING", "Hello World")
-            putExtra("KEY_INT", 42)
-            putExtra("KEY_BOOLEAN", true)
-            putExtra("KEY_FLOAT", 3.14f)
-        }
-        startActivity(intent)
-    }
-
     private fun intentToLogin() {
         startActivity(Intent(this, LoginActivity::class.java))
     }

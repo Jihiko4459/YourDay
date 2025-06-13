@@ -1,6 +1,27 @@
 package com.example.yourday.api
 
 import co.touchlab.kermit.Logger
+import com.example.yourday.models.BodyMeasurement
+import com.example.yourday.models.DailyFinances
+import com.example.yourday.models.DailyGoals
+import com.example.yourday.models.DailyIdeas
+import com.example.yourday.models.DailyNote
+import com.example.yourday.models.DailyNotes
+import com.example.yourday.models.DailyScreenData
+import com.example.yourday.models.DailyTasks
+import com.example.yourday.models.Goal
+import com.example.yourday.models.GoalProgress
+import com.example.yourday.models.GratitudeAndJoyJournal
+import com.example.yourday.models.GratitudeJournal
+import com.example.yourday.models.HealthData
+import com.example.yourday.models.Idea
+import com.example.yourday.models.NutritionLog
+import com.example.yourday.models.ProfileData
+import com.example.yourday.models.Steps
+import com.example.yourday.models.Task
+import com.example.yourday.models.Transaction
+import com.example.yourday.models.UserActivity
+import com.example.yourday.models.WaterIntake
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.BadRequestRestException
@@ -14,12 +35,13 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -149,8 +171,6 @@ class SupabaseHelper() {
         return when {
             e.message?.contains("already registered", ignoreCase = true) == true ->
                 "Email уже зарегистрирован"
-            e.message?.contains("password", ignoreCase = true) == true ->
-                "Пароль должен содержать минимум 6 символов"
             e.message?.contains("email", ignoreCase = true) == true ->
                 "Неверный формат email"
             e is java.net.ConnectException ->
@@ -271,23 +291,196 @@ class SupabaseHelper() {
             if (!exists) return code
         }
     }
+
+    suspend fun getDailyData(date: String): DailyScreenData? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            // Fetch all necessary data in parallel
+            val notes = getDailyNotes(date)
+            val gratitude = getGratitudeJournal(date)
+            val tasks = getDailyTasks(date)
+            val goals = getDailyGoals(date)
+            val ideas = getDailyIdeas(date)
+            val finances = getDailyFinances(date)
+
+            // Transform to DailyScreenData
+            DailyScreenData(
+                date = date,
+                tasks = DailyTasks(
+                    count = tasks.size,
+                    items = tasks,
+                    recommendation = "Plan your day effectively",
+                    emergency = "No emergencies"
+                ),
+                gratitudeJournal = GratitudeJournal(
+                    gratitudeItems = gratitude.mapNotNull { it.gratitude },
+                    joyItems = gratitude.mapNotNull { it.joy }
+                ),
+                notes = DailyNotes(
+                    items = notes.map {
+                        DailyNote(
+                            id = it.id,
+                            userId = it.userId,
+                            date = it.date.toString(),
+                            note = it.note ?: ""
+                        )
+                    }
+                ),
+                goals = DailyGoals(
+                    activeGoals = goals.map { goal ->
+                        GoalProgress(
+                            goal = Goal(
+                                id = goal.id,
+                                userId = goal.userId,
+                                title = goal.title,
+                                description = goal.description,
+                                goalTypeId = goal.goalTypeId,
+                                statusId = goal.statusId,
+                                progressGoal = goal.progressGoal ?: 0.0, // Handle nullable Double
+                                createdAt = goal.createdAt,
+                                achievedAt = goal.achievedAt,
+                                lastUpdated = goal.lastUpdated
+                            ),
+                            progress = goal.progressGoal ?: 0.0 // Use actual progress from goal
+                        )
+                    }
+                ),
+                ideas = DailyIdeas(
+                    items = ideas.map { idea ->
+                        Idea(
+                            id = idea.id,
+                            userId = idea.userId,
+                            date = idea.date, // Assuming idea.date is already String or convertible
+                            title = idea.title,
+                            description = idea.description
+                        )
+                    }
+                ),
+                finances = DailyFinances(
+                    balance = finances.sumOf { it.amount },
+                    income = finances.filter { it.amount > 0 }.sumOf { it.amount },
+                    expenses = finances.filter { it.amount < 0 }.sumOf { it.amount },
+                    lastTransaction = finances.maxByOrNull { it.date }?.let {
+                        Transaction(
+                            id = 0, // or get actual id if available
+                            userId = "", // or get actual userId
+                            title = it.title ?: "",
+                            description = it.description,
+                            balanceTypeId = null,
+                            amount = it.amount,
+                            date = it.date.toString()
+                        )
+                    }
+                )
+            )
+        } catch (e: Exception) {
+            Logger.e(e) { "Error fetching daily data" }
+            null
+        }
+    }
+
+    // For daily_notes table (assuming it's in the public schema)
+    private suspend fun getDailyNotes(date: String): List<DailyNote> {
+        return client.postgrest.from("daily.daily_notes")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getGratitudeJournal(date: String): List<GratitudeAndJoyJournal> {
+        return client.postgrest.from("daily.gratitude_and_joy_journals")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getDailyTasks(date: String): List<Task> {
+        return client.postgrest.from("tasks.tasks")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getDailyGoals(date: String): List<Goal> {
+        return client.postgrest.from("goals_and_habits.goals")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getDailyIdeas(date: String): List<Idea> {
+        return client.postgrest.from("daily.ideas")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getDailyFinances(date: String): List<Transaction> {
+        return client.postgrest.from("finance.transactions")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    suspend fun getHealthDataForDate(date: String): HealthData {
+        return try {
+            val steps = getStepsData(date)
+            val water = getWaterIntake(date)
+            val nutrition = emptyList<NutritionLog>() // Add proper nutrition data if available
+            val activity = getUserActivity(date)
+            val measurements = getBodyMeasurements(date)
+
+            HealthData(steps, water, nutrition, activity, measurements)
+        } catch (e: Exception) {
+            Logger.e(e) { "Error fetching health data" }
+            HealthData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+        }
+    }
+
+
+    // For health_and_fitness tables (assuming they're in the public schema)
+    private suspend fun getStepsData(date: String): List<Steps> {
+        return client.postgrest.from("health_and_fitness.steps")  // Remove "health_and_fitness." prefix
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getWaterIntake(date: String): List<WaterIntake> {
+        return client.postgrest.from("health_and_fitness.water_intake")  // Remove "health_and_fitness." prefix
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getUserActivity(date: String): List<UserActivity> {
+        return client.postgrest.from("health_and_fitness.user_activity")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
+    private suspend fun getBodyMeasurements(date: String): List<BodyMeasurement> {
+        return client.postgrest.from("health_and_fitness.body_measurements")
+            .select {
+                filter { eq("date", date) }
+            }
+            .decodeList()
+    }
+
 }
 
 private data class FriendshipCode(val friendship_code: String)
 
-@Serializable
-data class ProfileData(
-    @SerialName("user_id") val userId: String,
-    @SerialName("username") val username: String,
-    @Serializable(with = LocalDateSerializer::class)
-    @SerialName("birth_date") val birthDate: LocalDate,
-    @SerialName("gender_id") val genderId: Int? = null,
-    @SerialName("avatar_url") val avatarUrl: String? = null,
-    @SerialName("friendship_code") val friendshipCode: String,
-    @SerialName("registration_date") val registrationDate: String,
-    @SerialName("last_login") val lastLogin: String,
-    @SerialName("is_active") val isActive: Boolean
-)
+
 
 @Serializable(with = LocalDateSerializer::class)
 class LocalDateSerializer : KSerializer<LocalDate> {

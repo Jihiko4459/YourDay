@@ -39,7 +39,7 @@ fun YourDayTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) DarkColors else LightColors
+    val colors = if (!darkTheme) DarkColors else LightColors
 
     MaterialTheme(
         colorScheme = colors,
@@ -53,6 +53,5 @@ fun GetIsDarkTheme(
     darkTheme: Boolean = isSystemInDarkTheme()
 ): Boolean {
     val isDark = darkTheme
-
     return isDark
 }

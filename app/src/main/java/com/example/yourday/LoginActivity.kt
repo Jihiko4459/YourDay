@@ -101,21 +101,25 @@ class LoginActivity : ComponentActivity() {
                                         "Email не может быть пустым",
                                         ToastType.ERROR
                                     )
-                                } else if (!isValidEmail(cleanEmail)) {
+                                    return@launch
+                                }
+
+                                if (!isValidEmail(cleanEmail)) {
                                     ToastManager.show(
                                         "Неправильно введен email",
                                         ToastType.ERROR
                                     )
-                                } else if (password.isEmpty()) {
-                                    ToastManager.show(
-                                        "Пароль не может быть пустым",
-                                        ToastType.ERROR
-                                    )
-                                } else {
-                                    isLoading = true
-                                    handleLogin(cleanEmail, password, rememberMe)
-                                    isLoading = false
+                                    return@launch
                                 }
+
+                                // Валидация пароля перед входом
+                                if (!validatePassword(password)) {
+                                    return@launch
+                                }
+
+                                isLoading = true
+                                handleLogin(cleanEmail, password, rememberMe)
+                                isLoading = false
                             }
                         },
                         onForgotPasswordClick = {
@@ -178,7 +182,7 @@ class LoginActivity : ComponentActivity() {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
-    private fun validatePassword(password: String, confirmPassword: String): Boolean {
+    private fun validatePassword(password: String): Boolean {
         return when {
             password.isEmpty() -> {
                 ToastManager.show("Пароль не может быть пустым", ToastType.ERROR)
@@ -202,10 +206,6 @@ class LoginActivity : ComponentActivity() {
             }
             !password.any { !it.isLetterOrDigit() } -> {
                 ToastManager.show("Пароль должен содержать хотя бы один специальный символ", ToastType.ERROR)
-                false
-            }
-            password != confirmPassword -> {
-                ToastManager.show("Пароли не совпадают", ToastType.ERROR)
                 false
             }
             password == password.lowercase() -> {
