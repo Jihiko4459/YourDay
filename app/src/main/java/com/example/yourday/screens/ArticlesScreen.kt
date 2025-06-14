@@ -1,4 +1,4 @@
-package com.example.yourday
+package com.example.yourday.screens
 
 import androidx.compose.runtime.Composable
 

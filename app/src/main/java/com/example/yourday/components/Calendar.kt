@@ -31,6 +31,7 @@ import com.example.yourday.R
 import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Primary
 import com.example.yourday.ui.theme.Purple1
+import java.time.Instant
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,7 +41,7 @@ fun CustomDatePicker(
     modifier: Modifier = Modifier
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
-    val currentDate = remember { System.currentTimeMillis() }
+    val currentDate = remember {  Instant.now().toEpochMilli() }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = currentDate
     )

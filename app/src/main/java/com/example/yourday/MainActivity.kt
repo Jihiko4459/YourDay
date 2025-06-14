@@ -2,11 +2,13 @@ package com.example.yourday
 
 import CustomDatePicker
 import YourDayTheme
+import android.content.Context
+import android.content.Context.MODE_PRIVATE
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,10 +29,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -49,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -63,37 +68,40 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.yourday.api.SupabaseHelper
-import com.example.yourday.models.BodyMeasurement
-import com.example.yourday.models.DailyFinances
-import com.example.yourday.models.DailyGoals
-import com.example.yourday.models.DailyIdeas
-import com.example.yourday.models.DailyNotes
-import com.example.yourday.models.DailyScreenData
-import com.example.yourday.models.DailyTasks
-import com.example.yourday.models.GoalProgress
-import com.example.yourday.models.GratitudeJournal
-import com.example.yourday.models.HealthData
-import com.example.yourday.models.Idea
-import com.example.yourday.models.NutritionLog
-import com.example.yourday.models.Steps
-import com.example.yourday.models.Task
-import com.example.yourday.models.UserActivity
-import com.example.yourday.models.WaterIntake
+import com.example.yourday.model.BodyMeasurement
+import com.example.yourday.model.DailyNote
+import com.example.yourday.model.Goal
+import com.example.yourday.model.GratitudeAndJoyJournal
+import com.example.yourday.model.Idea
+import com.example.yourday.model.NutritionLog
+import com.example.yourday.model.Steps
+import com.example.yourday.model.Task
+import com.example.yourday.model.Transaction
+import com.example.yourday.model.UserActivity
+import com.example.yourday.model.WaterIntake
+import com.example.yourday.screens.ArticlesScreen
+import com.example.yourday.screens.ProfileScreen
 import com.example.yourday.ui.theme.Blue
+import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Gray1
 import com.example.yourday.ui.theme.Green
 import com.example.yourday.ui.theme.Primary
+import com.example.yourday.ui.theme.Purple1
 import com.example.yourday.ui.theme.Red
 import com.example.yourday.ui.theme.White
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import java.util.Calendar
+import kotlin.math.absoluteValue
 
 class MainActivity : ComponentActivity() {
     private val authHelper by lazy { SupabaseHelper() }
 
 
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             YourDayTheme {
                 val systemUiController = rememberSystemUiController()
@@ -115,10 +123,12 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxSize()
+                    Column(modifier = Modifier
+                        .fillMaxSize()
                         .padding(
                             top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding(),
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                            bottom = WindowInsets.navigationBars.asPaddingValues()
+                                .calculateBottomPadding()
                         )
                         ) {
                         // Основной контент
@@ -126,32 +136,17 @@ class MainActivity : ComponentActivity() {
                             navController = navController,
                             startDestination = "main",
                             modifier = Modifier.weight(1f)
-                                .padding(
-                                    top = WindowInsets.statusBars.asPaddingValues()
-                                        .calculateTopPadding(),
-                                    bottom = WindowInsets.navigationBars.asPaddingValues()
-                                        .calculateBottomPadding()
-                                ),
-                            enterTransition = { EnterTransition.None },
-                            exitTransition = { ExitTransition.None },
-                            popEnterTransition = { EnterTransition.None },
-                            popExitTransition = { ExitTransition.None }
                         ) {
                             composable("main") {
                                 MainScreen(
                                     onIntentToNotification = {},
-                                    supabaseHelper = remember { authHelper }
+                                    supabaseHelper = authHelper
                                 )
                             }
                             composable("articles") { ArticlesScreen() }
                             composable("profile") { ProfileScreen() }
-                            composable("daily") { DailyScreen(remember { authHelper }, onIntentToChecklist = {
-
-                            },
-                                onIntentToQuoteOTheDay = {
-
-                                }) }
-                            composable("health_and_fitness") { HealthAndFitnessScreen(remember { authHelper }) }
+                            composable("daily") { DailyScreen(authHelper) }
+                            composable("health_and_fitness") { HealthAndFitnessScreen(authHelper) }
                         }
 
                         // Нижняя панель навигации
@@ -183,7 +178,8 @@ fun MainScreen(
         ) {
 
             Row(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
                     .padding(top = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -234,7 +230,7 @@ fun NavigationWithCustomMenu(navController: NavHostController, supabaseHelper: S
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Верхняя панель с табами
-        Column(modifier = Modifier.padding(top = 47.dp)) {
+        Column(modifier = Modifier.padding(top = 20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -308,18 +304,9 @@ fun NavigationWithCustomMenu(navController: NavHostController, supabaseHelper: S
         NavHost(
             navController = navController,
             startDestination = "daily",
-            modifier = Modifier.weight(1f),
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+            modifier = Modifier.weight(1f)
         ) {
-            composable("daily") { DailyScreen(supabaseHelper, onIntentToChecklist = {
-
-            },
-                onIntentToQuoteOTheDay = {
-
-                }) }
+            composable("daily") { DailyScreen(supabaseHelper) }
             composable("health_and_fitness") { HealthAndFitnessScreen(supabaseHelper) }
         }
     }
@@ -330,39 +317,18 @@ fun NavigationWithCustomMenu(navController: NavHostController, supabaseHelper: S
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DailyScreen(
-    supabaseHelper: SupabaseHelper,
-    onIntentToChecklist: () -> Unit,
-    onIntentToQuoteOTheDay: () -> Unit
+    supabaseHelper: SupabaseHelper
 ) {
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
-    var dailyData by remember { mutableStateOf<DailyScreenData?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val userId = getUserId(context)
+    val dateStr = convertMillisToDateString(selectedDate)
 
-    // Convert millis to date string
-    fun convertMillisToDateString(millis: Long): String {
-        val calendar = Calendar.getInstance().apply { timeInMillis = millis }
-        val year = calendar.get(Calendar.YEAR)
-        val month = (calendar.get(Calendar.MONTH) + 1).toString().padStart(2, '0')
-        val day = calendar.get(Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
-        return "$year-$month-$day"
-    }
 
-    // Load data when date changes
-    LaunchedEffect(selectedDate) {
-        isLoading = true
-        errorMessage = null
-        try {
-            val dateStr = convertMillisToDateString(selectedDate)
-            dailyData = supabaseHelper.getDailyData(dateStr)
-        } catch (e: Exception) {
-            errorMessage = "Failed to load data: ${e.message}"
-        } finally {
-            isLoading = false
-        }
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState()), // Добавляем вертикальный скролл
+        verticalArrangement = Arrangement.spacedBy(6.dp) ){// Расстояние 6.dp между элементами)
         CustomDatePicker(
             onDateSelected = { millis ->
                 selectedDate = millis
@@ -373,7 +339,7 @@ fun DailyScreen(
         )
 
         Column(
-            modifier = Modifier.padding(top=16.dp),
+            modifier = Modifier.padding(top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Button(
@@ -381,7 +347,7 @@ fun DailyScreen(
                     .fillMaxWidth()
                     .height(49.dp)
                     .background(Primary, RoundedCornerShape(10.dp)),
-                onClick = onIntentToChecklist
+                onClick = {onIntentToChecklist(context)}
             ) {
                 Text("Подготовиться к выходу из дома")
             }
@@ -391,49 +357,37 @@ fun DailyScreen(
                     .fillMaxWidth()
                     .height(49.dp)
                     .background(Primary, RoundedCornerShape(10.dp)),
-                onClick = onIntentToQuoteOTheDay
+                onClick = {onIntentToQuoteOTheDay(context)}
             ) {
                 Text("Ваша цитата дня")
             }
-
-
-            when {
-                isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize().padding(top = 20.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                errorMessage != null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(errorMessage ?: "Unknown error", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-                dailyData == null -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No data available for selected date")
-                    }
-                }
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        dailyData?.let { data ->
-                            item { TasksSection(data.tasks) }
-                            item { GratitudeJournalSection(data.gratitudeJournal) }
-                            item { NotesSection(data.notes) }
-                            item { GoalsSection(data.goals) }
-                            item { IdeasSection(data.ideas) }
-                            item { FinancesSection(data.finances) }
-                        }
-                    }
-                }
-            }
+            TasksSection(dateStr, userId, supabaseHelper)
+            GratitudeJournalSection(dateStr, userId, supabaseHelper)
+            NotesSection(dateStr, userId, supabaseHelper)
+            GoalsSection(dateStr, userId, supabaseHelper)
+            IdeasSection(dateStr, userId, supabaseHelper)
+            FinancesSection(dateStr, userId, supabaseHelper)
         }
-
-
     }
 }
+
+private fun onIntentToChecklist(context: Context){
+
+}
+
+
+private  fun onIntentToQuoteOTheDay(context: Context){
+    val intent = Intent(context, UserDailyQuoteActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+    }
+    context.startActivity(intent)
+}
+
+private fun getUserId(context: Context): String {
+    val sharedPref = context.getSharedPreferences("authorization", MODE_PRIVATE)
+    return sharedPref.getString("USER_ID", "") ?: ""
+}
+
 
 // Вспомогательная функция
 private fun convertMillisToDateString(millis: Long): String {
@@ -445,54 +399,109 @@ private fun convertMillisToDateString(millis: Long): String {
 }
 
 @Composable
-private fun TasksSection(tasks: DailyTasks) {
+private fun TasksSection(date: String, userId: String, supabaseHelper: SupabaseHelper,) {
+    var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            tasks = supabaseHelper.getDailyTasks(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load tasks: ${e.message}"
+            Log.e("TasksSection", "Error loading tasks", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Задачи",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (tasks.items.isEmpty()) {
-                Column {
-                    Text(
-                        text = "Внимание! Сегодня обнаружено: 0 задач.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Рекомендуется: ${tasks.recommendation}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.task_ic),
+                        contentDescription = "Задачи",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
                     )
                     Text(
-                        text = "Чрезвычайная ситуация: ${tasks.emergency}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Задачи",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
                     )
                 }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Сегодня у вас ${tasks.count} задач",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить задачу",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
                     )
-                    tasks.items.forEach { task ->
-                        TaskItem(task = task)
-                    }
+                }
+            }
+
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                tasks.isEmpty() ->Text(
+                    text = "Внимание! Сегодня обнаружено: 0 задач.\nРекомендуется: чай, плед, любимый сериал.\nЧрезвычайная ситуация: полный релакс.",
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                        textAlign = TextAlign.Center,
+                        color = DarkBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                )
+                else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tasks.forEach { task -> TaskItem(task) }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
     }
 }
+
+
 
 @Composable
 private fun TaskItem(task: Task) {
@@ -520,45 +529,165 @@ private fun TaskItem(task: Task) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = task.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = TextStyle(
+                    fontSize = 16.sp,
+                    fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                    textAlign = TextAlign.Center,
+                    color = DarkBlue
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
-            task.description?.let { description ->
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
     }
 }
 @Composable
-private fun GratitudeJournalSection(journal: GratitudeJournal) {
-    Card(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Дневник благодарности и радости",
-                style = MaterialTheme.typography.titleLarge)
+private fun GratitudeJournalSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
 
-            if (journal.gratitudeItems.isNotEmpty()) {
-                Text("Я благодарен за:", style = MaterialTheme.typography.bodyMedium)
-                journal.gratitudeItems.forEach { item ->
-                    Text("• $item", modifier = Modifier.padding(start = 8.dp))
+    var journal by remember { mutableStateOf<List<GratitudeAndJoyJournal>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            journal = supabaseHelper.getGratitudeJournal(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load journal: ${e.message}"
+            Log.e("GratitudeJournalSection", "Error loading journal", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
+
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.star_ic),
+                        contentDescription = "Дневник благодарности и радости",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        text = "Дневник благодарности и радости",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить запись в дневник благодарности и радости",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
                 }
             }
 
-            if (journal.joyItems.isNotEmpty()) {
-                Text("Мои радости:", style = MaterialTheme.typography.bodyMedium)
-                journal.joyItems.forEach { item ->
-                    Text("• $item", modifier = Modifier.padding(start = 8.dp))
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                journal.isEmpty() -> Column {
+                    Text(
+                        text="Каждый день – повод для радости! За что вы благодарны сегодня?",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                            textAlign = TextAlign.Center,
+                            color = DarkBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+
+                    )
+                }
+                else -> journal.forEach { entry ->
+                    Column {
+                        Text(
+                            text=date,
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Start,
+                                color = DarkBlue
+                            )
+                        )
+                        Spacer(modifier = Modifier.padding(top = 10.dp))
+                        Text(
+                            text="Я благодарен за:",
+                            style = TextStyle(
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Start,
+                                color = DarkBlue
+                            )
+                        )
+                        Spacer(modifier = Modifier.padding(top = 6.dp))
+                        entry.gratitude?.let { Text("• $it",
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Start,
+                                color = DarkBlue
+                            )
+                        ) }
+                        Text(
+                            text="Мои радости:",
+                            style = TextStyle(
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Start,
+                                color = DarkBlue
+                            )
+                        )
+                        Spacer(modifier = Modifier.padding(top = 6.dp))
+                        entry.joy?.let { Text("• $it",
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Start,
+                                color = DarkBlue
+                            )
+                        ) }
+                    }
                 }
             }
-
-            if (journal.gratitudeItems.isEmpty() && journal.joyItems.isEmpty()) {
-                Text("Каждый день – повод для радости! За что вы благодарны сегодня?",
-                    style = MaterialTheme.typography.bodyMedium)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
+                }
             }
         }
     }
@@ -566,41 +695,110 @@ private fun GratitudeJournalSection(journal: GratitudeJournal) {
 
 // 1. NotesSection
 @Composable
-private fun NotesSection(notes: DailyNotes) {
+private fun NotesSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+
+    var notes by remember { mutableStateOf<List<DailyNote>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            notes = supabaseHelper.getDailyNotes(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load notes: ${e.message}"
+            Log.e("NotesSection", "Error loading notes", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Заметки",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (notes.items.isEmpty()) {
-                Text(
-                    text = "Каждая большая история начинается с первого слова. Что вас вдохновляет сегодня?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                notes.items.forEach { note ->
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.doc2_ic),
+                        contentDescription = "Заметки",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        text = "Заметки",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить заметку",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                }
+            }
+
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                notes.isEmpty() -> Column {
+                    Text(
+                        text="Здесь могли бы быть ваши заметки.",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                            textAlign = TextAlign.Center,
+                            color = DarkBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                    )
+                }
+                else -> {
+                    val note = notes[notes.size - 1]
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        Text(
-                            text = note.date,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "\"${note.note}\"",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        Text(note.date.toString(), style = MaterialTheme.typography.labelSmall)
+                        Text("\"${note.note}\"", style = MaterialTheme.typography.bodyMedium)
                     }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
@@ -610,31 +808,103 @@ private fun NotesSection(notes: DailyNotes) {
 
 // 3. GoalsSection
 @Composable
-private fun GoalsSection(goals: DailyGoals) {
+private fun GoalsSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            goals = supabaseHelper.getDailyGoals(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load goals: ${e.message}"
+            Log.e("GoalsSection", "Error loading goals", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Цели",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (goals.activeGoals.isEmpty()) {
-                Text(
-                    text = "Какие цели вы хотите достичь? Начните с малого - добавьте свою первую цель!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    goals.activeGoals.forEach { goalProgress ->
-                        GoalItem(goalProgress = goalProgress)
-                    }
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.goal_ic),
+                        contentDescription = "Цели",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        text = "Цели",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить цель",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                }
+            }
+
+
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                goals.isEmpty() -> Text(
+                        text="Какие цели вы хотите достичь? Начните с малого - добавьте свою первую цель!",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                            textAlign = TextAlign.Center,
+                            color = DarkBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                    )
+                else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    goals.forEach { goal -> GoalItem(goal) }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
@@ -642,17 +912,31 @@ private fun GoalsSection(goals: DailyGoals) {
 }
 
 @Composable
-private fun GoalItem(goalProgress: GoalProgress) {
+private fun GoalItem(goalProgress: Goal) {
     Column {
-        Text(
-            text = goalProgress.goal.title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth(),
+        ) {
+            // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+            Icon(
+                painter = painterResource(id = R.drawable.notific),
+                contentDescription = "Уведомления",
+                modifier = Modifier.size(24.dp),
+                tint = Primary
+            )
+
+            Text(
+                modifier = Modifier.padding(start = 2.dp),
+                text = goalProgress.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
 
         // Progress bar
         LinearProgressIndicator(
-            progress = goalProgress.progress.toFloat(),
+            progress = goalProgress.progressGoal.toFloat(),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp)
@@ -662,7 +946,7 @@ private fun GoalItem(goalProgress: GoalProgress) {
         )
 
         Text(
-            text = "${(goalProgress.progress * 100).toInt()}%",
+            text = "${(goalProgress.progressGoal * 100).toInt()}%",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.End)
@@ -673,31 +957,102 @@ private fun GoalItem(goalProgress: GoalProgress) {
 
 // 4. IdeasSection
 @Composable
-private fun IdeasSection(ideas: DailyIdeas) {
+private fun IdeasSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var ideas by remember { mutableStateOf<List<Idea>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            ideas = supabaseHelper.getDailyIdeas(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load ideas: ${e.message}"
+            Log.e("IdeasSection", "Error loading ideas", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Идеи",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (ideas.items.isEmpty()) {
-                Text(
-                    text = "Запишите свою первую идею — вдруг это начало чего-то грандиозного?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.light_bulb_on_ic),
+                        contentDescription = "Идея",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        text = "Идеи",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить идею",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                }
+            }
+
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                ideas.isEmpty() -> Text(
+                    text="Запишите свою первую идею — вдруг это начало чего-то грандиозного?",
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                        textAlign = TextAlign.Center,
+                        color = DarkBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top=6.dp)
                 )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ideas.items.forEach { idea ->
-                        IdeaItem(idea = idea)
-                    }
+                else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ideas.forEach { idea -> IdeaItem(idea) }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
@@ -707,117 +1062,198 @@ private fun IdeasSection(ideas: DailyIdeas) {
 @Composable
 private fun IdeaItem(idea: Idea) {
     Row(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(text = "–", modifier = Modifier.padding(end = 8.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = idea.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
+        Text(text = "–", modifier = Modifier.padding(start = 3.dp, end = 8.dp))
+        Text(
+            text = idea.title,
+            style = TextStyle(
+                fontSize = 16.sp,
+                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                textAlign = TextAlign.Center,
+                color = DarkBlue
             )
-            idea.description?.let { description ->
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-        }
+        )
     }
 }
 
 // 5. FinancesSection
 @Composable
-private fun FinancesSection(finances: DailyFinances) {
+private fun FinancesSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var transactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            transactions = supabaseHelper.getDailyFinances(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load transactions: ${e.message}"
+            Log.e("FinancesSection", "Error loading transactions", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val totalIncome = remember(transactions) {
+        transactions.filter { it.amount > 0 }.sumOf { it.amount }
+    }
+    val totalExpenses = remember(transactions) {
+        transactions.filter { it.amount < 0 }.sumOf { it.amount }.absoluteValue
+    }
+    val balance = remember(transactions) {
+        transactions.sumOf { it.amount }
+    }
+
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Доходы и расходы",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (finances.lastTransaction == null) {
-                Text(
-                    text = "Ваша первая запись появится здесь. Начните с малого — зафиксируйте сегодняшний кофе или проезд.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Баланс
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Баланс:",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "${finances.balance} ₽",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (finances.balance >= 0) Green else Red
-                        )
-                    }
-
-                    // Доходы/расходы
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Доходы: ${finances.income} ₽",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Green
-                        )
-                        Text(
-                            text = "Расходы: ${finances.expenses} ₽",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Red
-                        )
-                    }
-
-                    // Последняя операция
-                    Text(
-                        text = "Последняя операция:",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.money_ic),
+                        contentDescription = "Финансф",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
                     )
+                    Text(
+                        text = "Финансы",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
+                }
 
-                    finances.lastTransaction?.let { transaction ->
-                        Column {
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(text = transaction.date)
-                                Text(
-                                    text = "${transaction.amount} ₽",
-                                    color = if (transaction.amount >= 0) Green else Red
-                                )
-                            }
-                            Text(
-                                text = transaction.title,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            transaction.description?.let { description ->
-                                Text(
-                                    text = description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить операцию",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                }
+            }
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                transactions.isEmpty() ->
+                    Text(
+                        text="Ваша первая запись появится здесь. Начните с малого — зафиксируйте сегодняшний кофе или проезд.",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                            textAlign = TextAlign.Center,
+                            color = DarkBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                    )
+                else -> {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Доходы: ${totalIncome} ₽",
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Center,
+                                color = Green
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(top=2.dp)
+                        )
+                        Text("Расходы: ${totalExpenses} ₽",
+                            style = TextStyle(
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                                textAlign = TextAlign.Center,
+                                color = Red
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(top=2.dp)
+                        )
                     }
+                    Text("Баланс: ${balance} ₽",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                            textAlign = TextAlign.Center,
+                            color = if (balance >= 0) Green else Red,
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(top=2.dp)
+                    )
+                    Text("Последняя операция:",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                            textAlign = TextAlign.Center,
+                            color = if (balance >= 0) Green else Red,
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(top=2.dp)
+                    )
+                    TransactionItem(transactions[0])
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
+    }
+    Spacer(modifier = Modifier.padding(bottom = 4.dp))
+}
+@Composable
+fun TransactionItem(transaction: Transaction) {
+    Text(
+        text=transaction.date,
+        style = TextStyle(
+            fontSize = 16.sp,
+            fontFamily = FontFamily(Font(R.font.roboto_regular)),
+            textAlign = TextAlign.Start,
+            color = DarkBlue
+        ),
+        modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(transaction.title)
+            transaction.description?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Text(
+            "${transaction.amount} ₽",
+            color = if (transaction.amount > 0) Green else Red
+        )
     }
 }
 
@@ -826,24 +1262,15 @@ private fun FinancesSection(finances: DailyFinances) {
 @Composable
 fun HealthAndFitnessScreen(supabaseHelper: SupabaseHelper) {
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
-    var healthData by remember { mutableStateOf<HealthData?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val userId = getUserId(context)
+    val dateStr = convertMillisToDateString(selectedDate)
 
-    LaunchedEffect(selectedDate) {
-        isLoading = true
-        errorMessage = null
-        try {
-            val dateStr = convertMillisToDateString(selectedDate)
-            healthData = supabaseHelper.getHealthDataForDate(dateStr)
-        } catch (e: Exception) {
-            errorMessage = "Failed to load health data: ${e.message}"
-        } finally {
-            isLoading = false
-        }
-    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState()), // Добавляем вертикальный скролл
+        verticalArrangement = Arrangement.spacedBy(16.dp) ){// Расстояние 6.dp между элементами)
         CustomDatePicker(
             onDateSelected = { millis ->
                 selectedDate = millis
@@ -852,46 +1279,91 @@ fun HealthAndFitnessScreen(supabaseHelper: SupabaseHelper) {
                 .fillMaxWidth()
                 .padding(top = 22.dp)
         )
+        StepsSection(dateStr, userId, supabaseHelper)
+        WaterSection(dateStr, userId, supabaseHelper)
+        ActivitySection(dateStr, userId, supabaseHelper)
+        NutritionSection(dateStr, userId, supabaseHelper)
+        MeasurementsSection(dateStr, userId, supabaseHelper)
+    }
+}
+@Composable
+private fun StepsSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var steps by remember { mutableStateOf<List<Steps>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-        when {
-            isLoading -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally).padding(top = 20.dp))
-            errorMessage != null -> Text(errorMessage!!, color = MaterialTheme.colorScheme.error)
-            healthData == null -> Text("No health data available")
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            steps = supabaseHelper.getStepsData(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load steps data: ${e.message}"
+            Log.e("StepsSection", "Error loading steps", e)
+        } finally {
+            isLoading = false
+        }
+    }
+    val totalSteps = remember(steps) {
+        steps.sumOf { it.stepsCount }
+    }
+    val targetSteps = 10000
+    val progress = remember(totalSteps) {
+        totalSteps.toFloat() / targetSteps
+    }
+
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
+
                 ) {
-                    item { StepsSection(healthData!!.steps) }
-                    item { ActivitySection(healthData!!.activity) }
-                    item { NutritionSection(healthData!!.nutrition) }
-                    item { WaterSection(healthData!!.water) }
-                    item { MeasurementsSection(healthData!!.measurements) }
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.foot_ic),
+                        contentDescription = "Шаги",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        text = "Шаги",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
                 }
             }
-        }
-    }
-}
-@Composable
-private fun StepsSection(steps: List<Steps>) {
-    val stepData = steps.firstOrNull() ?: return
-    val distanceKm=0.0
-    val caloriesBurned=0.0
-    val durationMinutes=0.0
-
-    Card(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Шаги", style = MaterialTheme.typography.titleLarge)
-            LinearProgressIndicator(
-                progress = (stepData.stepsCount.toFloat() / 10000),
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
-            Text("${stepData.stepsCount}/10 000 шагов (${(stepData.stepsCount.toFloat() / 10000 * 100).toInt()}%)")
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("${distanceKm} км")
-                Text("${caloriesBurned} ккал")
-                Text("${durationMinutes} мин")
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                else -> {
+                    LinearProgressIndicator(
+                        progress = progress.coerceAtMost(1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp),
+                        color = Blue
+                    )
+                    Text("$totalSteps / $targetSteps шагов (${(progress * 100).toInt()}%)")
+                }
             }
+
         }
     }
 }
@@ -899,22 +1371,94 @@ private fun StepsSection(steps: List<Steps>) {
 
 
 @Composable
-private fun WaterSection(water: List<WaterIntake>) {
-    val waterData = water.firstOrNull() ?: return
-    val targetMl=2500.0
-    Card(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Вода", style = MaterialTheme.typography.titleLarge)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(
-                    progress = (waterData.amountMl / targetMl).toFloat(),
-                    modifier = Modifier.size(40.dp)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text("${waterData.amountMl/1000}/${targetMl/1000} л")
+private fun WaterSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var water by remember { mutableStateOf<List<WaterIntake>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            water = supabaseHelper.getWaterIntake(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load water data: ${e.message}"
+            Log.e("WaterSection", "Error loading water data", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val totalWater = remember(water) {
+        water.sumOf { it.amountMl }
+    }
+    val targetWater = 2500
+    val progress = remember(totalWater) {
+        totalWater.toFloat() / targetWater
+    }
+
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
+
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.drop_ic),
+                        contentDescription = "Вода",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        text = "Вода",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить прием воды",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                }
             }
-            Text("Регулярное употребление воды снижает риск инфаркта.",
-                style = MaterialTheme.typography.bodySmall)
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                else -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            progress = progress.coerceAtMost(1f),
+                            modifier = Modifier.size(40.dp),
+                            color = Blue
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text("${totalWater} / $targetWater мл")
+                    }
+                }
+            }
         }
     }
 }
@@ -939,15 +1483,17 @@ fun BottomNavigationBar(navController: NavHostController) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .clickable { navController.navigate("main"){
-                    anim {
-                        enter = 0
-                        exit = 0
-                        popEnter = 0
-                        popExit = 0
+                .clickable {
+                    navController.navigate("main") {
+                        anim {
+                            enter = 0
+                            exit = 0
+                            popEnter = 0
+                            popExit = 0
+                        }
+                        launchSingleTop = true
                     }
-                    launchSingleTop = true
-                } }
+                }
                 .padding(8.dp)
                 .weight(1f)
         ) {
@@ -975,15 +1521,17 @@ fun BottomNavigationBar(navController: NavHostController) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .clickable { navController.navigate("articles"){
-                    anim {
-                        enter = 0
-                        exit = 0
-                        popEnter = 0
-                        popExit = 0
+                .clickable {
+                    navController.navigate("articles") {
+                        anim {
+                            enter = 0
+                            exit = 0
+                            popEnter = 0
+                            popExit = 0
+                        }
+                        launchSingleTop = true
                     }
-                    launchSingleTop = true
-                } }
+                }
                 .padding(8.dp)
                 .weight(1f)
         ) {
@@ -1011,15 +1559,17 @@ fun BottomNavigationBar(navController: NavHostController) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .clickable { navController.navigate("profile"){
-                    anim {
-                        enter = 0
-                        exit = 0
-                        popEnter = 0
-                        popExit = 0
+                .clickable {
+                    navController.navigate("profile") {
+                        anim {
+                            enter = 0
+                            exit = 0
+                            popEnter = 0
+                            popExit = 0
+                        }
+                        launchSingleTop = true
                     }
-                    launchSingleTop = true
-                } }
+                }
                 .padding(8.dp)
                 .weight(1f)
         ) {
@@ -1046,73 +1596,106 @@ fun BottomNavigationBar(navController: NavHostController) {
 }
 
 @Composable
-private fun ActivitySection(activities: List<UserActivity>) {
-    val lastActivity = activities.firstOrNull()
-    val activityTypes = remember { listOf("Прогулка", "Пробежка", "Тренировка") } // Example types
+private fun ActivitySection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var activities by remember { mutableStateOf<List<UserActivity>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            activities = supabaseHelper.getUserActivity(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load activities: ${e.message}"
+            Log.e("ActivitySection", "Error loading activities", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+    val totalMinutes = remember(activities) {
+        activities.sumOf { it.durationMinutes }
+    }
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
-        shape = RoundedCornerShape(12.dp)
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Активность",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (activities.isEmpty()) {
-                Column {
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.cyclist_ic),
+                        contentDescription = "Активность",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
                     Text(
-                        text = "Добавьте прогулку, пробежку или тренировку — маленькие шаги приводят к большим результатам!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Активность",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
                     )
                 }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Summary stats
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "400.3 ккал",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "1 ч. 00 мин.",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Last activity
-                    Text(
-                        text = "Последняя активность",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить активность",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
                     )
-
-                    lastActivity?.let { activity ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "250 ккал · 30 мин. · Бег",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "Сегодня, 08:30",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                }
+            }
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                activities.isEmpty() -> Text(
+                    text="Добавьте прогулку, пробежку или тренировку — маленькие шаги приводят к большим результатам!",
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                        textAlign = TextAlign.Center,
+                        color = DarkBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                )
+                else -> {
+                    Text("Всего активности: ${totalMinutes} минут")
+                    activities.forEach { activity -> ActivityItem(activity) }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
@@ -1120,74 +1703,114 @@ private fun ActivitySection(activities: List<UserActivity>) {
 }
 
 @Composable
-private fun NutritionSection(nutritionLogs: List<NutritionLog>) {
-    val lastMeal = nutritionLogs.firstOrNull()
+fun ActivityItem(activity: UserActivity) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text(
+            "Активность: ${activity.activityTypeId ?: "Не указано"}",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            "Продолжительность: ${activity.durationMinutes} мин",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun NutritionSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var nutritionLogs by remember { mutableStateOf<List<NutritionLog>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            nutritionLogs = supabaseHelper.getNutritionLogs(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load nutrition data: ${e.message}"
+            Log.e("NutritionSection", "Error loading nutrition data", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
 
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Прием пищи",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (nutritionLogs.isEmpty()) {
-                Column {
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.apple_ic),
+                        contentDescription = "Питание",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
                     Text(
-                        text = "Начните с первого приема пищи — даже маленькая запись помогает контролировать рацион.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Питание",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
                     )
                 }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Summary stats
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = "300.0 ккал", style = MaterialTheme.typography.bodyLarge)
-                        Text(text = "8.0 г", style = MaterialTheme.typography.bodyLarge)
-                        Text(text = "400.3 г", style = MaterialTheme.typography.bodyLarge)
-                        Text(text = "400.3 г", style = MaterialTheme.typography.bodyLarge)
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Last meal
-                    Text(
-                        text = "Последний прием пищи",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить прием пищи",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
                     )
-
-                    lastMeal?.let { meal ->
-                        Column {
-                            Text(
-                                text = "Овсянка с фруктами",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "300 ккал · 8.0 г · 5.0 г · 55 г · Завтрак",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Text(
-                                    text = "Сегодня, 08:30",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                }
+            }
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                nutritionLogs.isEmpty() -> Text(
+                    text="Начните с первого приема пищи — даже маленькая запись помогает контролировать рацион.",
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                        textAlign = TextAlign.Center,
+                        color = DarkBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                )
+                else -> nutritionLogs.forEach { log -> NutritionItem(log) }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
@@ -1195,97 +1818,146 @@ private fun NutritionSection(nutritionLogs: List<NutritionLog>) {
 }
 
 @Composable
-private fun MeasurementsSection(measurements: List<BodyMeasurement>) {
-    val latestMeasurement = measurements.firstOrNull()
+fun NutritionItem(log: NutritionLog) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text(
+            "Прием пищи: ${log.mealTypeId ?: "Не указано"}",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            "Количество: ${log.quantity}",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun MeasurementsSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+    var measurements by remember { mutableStateOf<List<BodyMeasurement>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        error = null
+        try {
+            measurements = supabaseHelper.getBodyMeasurements(date, userId)
+        } catch (e: Exception) {
+            error = "Failed to load measurements: ${e.message}"
+            Log.e("MeasurementsSection", "Error loading measurements", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
 
     Card(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = Purple1),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Измерения тела",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+        Column(modifier = Modifier.padding(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier,
+                    verticalAlignment = Alignment.CenterVertically
 
-            if (measurements.isEmpty()) {
-                Column {
+                ) {
+                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ruler_ic),
+                        contentDescription = "Измерения тела",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
                     Text(
-                        text = "Добавьте первое измерение — это поможет отслеживать ваш прогресс!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Измерения тела",
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_bold))
+                        ),
+                        color = DarkBlue,
+                        modifier = Modifier.padding(3.dp)
                     )
                 }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    latestMeasurement?.let { measurement ->
-                        // Weight with change
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Вес:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "79 кг (-3.0 кг)",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
 
-                        // Chest measurement
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Грудь:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "105 см (0 см)",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.add_ic),
+                        contentDescription = "Добавить запись об измерении тела",
+                        modifier = Modifier.size(33.dp),
+                        tint = Primary
+                    )
+                }
+            }
 
-                        // Waist measurement
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Талия:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "79 см (-1 см)",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-
-                        // Hips measurement
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Бедра:",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = "111 см (-2 см)",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+            when {
+                isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
+                measurements.isEmpty() -> Text(
+                    text="Добавьте первое измерение — это поможет отслеживать ваш прогресс!",
+                    style = TextStyle(
+                        fontSize = 16.sp,
+                        fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                        textAlign = TextAlign.Center,
+                        color = DarkBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(top=6.dp)
+                )
+                else -> measurements.firstOrNull()?.let { latest ->
+                    MeasurementItem("Вес", latest.weight?.toString() ?: "Н/Д", "кг")
+                    MeasurementItem("Рост", latest.height?.toString() ?: "Н/Д", "см")
+                    MeasurementItem("Обхват груди", latest.chestCircum?.toString() ?: "Н/Д", "см")
+                    MeasurementItem("Обхват талии", latest.waistCircum?.toString() ?: "Н/Д", "см")
+                    MeasurementItem("Обхват бедер", latest.hipCircum?.toString() ?: "Н/Д", "см")
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onIntentToAddScreenTask() }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.more_ic),
+                        contentDescription = "Перейти на расширенный список",
+                        modifier = Modifier.size(24.dp),
+                        tint = Primary
+                    )
                 }
             }
         }
     }
+    Spacer(modifier = Modifier.padding(bottom = 4.dp))
+
+}
+
+@Composable
+fun MeasurementItem(name: String, value: String, unit: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(name)
+        Text("$value $unit")
+    }
+}
+
+private fun onIntentToAddScreenTask(){
+
+}
+
+private fun onIntentToAddScreenNote(){
+
 }
 
 

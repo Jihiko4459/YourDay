@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization) // Добавьте плагин для Kotlin Serialization
+    alias(libs.plugins.kotlin.kapt)
 
 }
 
@@ -12,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.yourday"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -40,22 +41,38 @@ android {
         compose = true
     }
 }
+// Room - база данных на телефоне (как Excel, но для приложений)
+val room_version = "2.6.1" // всегда бери последнюю стабильную версию
+
 
 dependencies {
 
 
-    implementation("com.jakewharton.threetenabp:threetenabp:1.4.6")
+    //библиотека Coil для загрузки изображений по URL
+    implementation("io.coil-kt:coil-compose:2.4.0") // Последняя версия Coil
 
-    implementation("co.touchlab:kermit-android-debug:2.0.3")
+    // Сама библиотека Room
+    implementation("androidx.room:room-runtime:$room_version")
+    // Дополнительно - поддержка Kotlin корутин для Room
+    implementation("androidx.room:room-ktx:$room_version")
+    kapt("androidx.room:room-compiler:2.6.1")
+
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
 
 
     // Supabase (используйте одинаковые версии для всех модулей!)
+
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.1")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.1")
     implementation("io.github.jan-tennert.supabase:storage-kt:2.2.1") // Обновите до той же версии
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.2.1") // Опционально, для realtime-функций
     implementation("io.ktor:ktor-client-okhttp:2.3.7") // HTTP-клиент (совместим с 2.2.1)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0") // Для сериализации
+
 
 
     implementation("androidx.preference:preference-ktx:1.2.1")

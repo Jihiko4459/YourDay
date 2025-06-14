@@ -1,27 +1,19 @@
 package com.example.yourday.api
 
 import co.touchlab.kermit.Logger
-import com.example.yourday.models.BodyMeasurement
-import com.example.yourday.models.DailyFinances
-import com.example.yourday.models.DailyGoals
-import com.example.yourday.models.DailyIdeas
-import com.example.yourday.models.DailyNote
-import com.example.yourday.models.DailyNotes
-import com.example.yourday.models.DailyScreenData
-import com.example.yourday.models.DailyTasks
-import com.example.yourday.models.Goal
-import com.example.yourday.models.GoalProgress
-import com.example.yourday.models.GratitudeAndJoyJournal
-import com.example.yourday.models.GratitudeJournal
-import com.example.yourday.models.HealthData
-import com.example.yourday.models.Idea
-import com.example.yourday.models.NutritionLog
-import com.example.yourday.models.ProfileData
-import com.example.yourday.models.Steps
-import com.example.yourday.models.Task
-import com.example.yourday.models.Transaction
-import com.example.yourday.models.UserActivity
-import com.example.yourday.models.WaterIntake
+import com.example.yourday.model.BodyMeasurement
+import com.example.yourday.model.DailyNote
+import com.example.yourday.model.Goal
+import com.example.yourday.model.GratitudeAndJoyJournal
+import com.example.yourday.model.Idea
+import com.example.yourday.model.MotivationalCard
+import com.example.yourday.model.NutritionLog
+import com.example.yourday.model.ProfileData
+import com.example.yourday.model.Steps
+import com.example.yourday.model.Task
+import com.example.yourday.model.Transaction
+import com.example.yourday.model.UserActivity
+import com.example.yourday.model.WaterIntake
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.BadRequestRestException
@@ -33,11 +25,9 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import io.ktor.client.plugins.HttpRequestTimeoutException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -48,6 +38,8 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.random.Random
@@ -63,47 +55,67 @@ class SupabaseHelper() {
 
         ) {
             install(Auth) {
-                alwaysAutoRefresh = false // Отключаем автообновление
-                autoLoadFromStorage = false // Отключаем автосохранение сессии
+                alwaysAutoRefresh = false // Лучше отключить автообновление
+                autoLoadFromStorage = true // Включить автосохранение
             }
             install(Postgrest) {
                 serializer = KotlinXSerializer()
             }
 
+
+
+
         }
 
     }
-    init {
-        // Очищаем сессию при инициализации
-        runBlocking {
-            try {
-                client.auth.signOut()
-            } catch (e: Exception) {
-                log.e(e) { "Failed to clear session" }
-            }
-        }
-    }
 
-    suspend fun safeSignOut() {
-        try {
-            // Получаем текущую сессию без проверки валидности
-            val session = client.auth.currentSessionOrNull()
-            if (session != null) {
-                try {
-                    // Пытаемся выйти стандартным способом
-                    client.auth.signOut()
-                } catch (e: Exception) {
-                    if (e.message?.contains("User from sub claim in JWT does not exist") == true) {
-                        // Если пользователь не существует, просто очищаем локальную сессию
-                        log.w { "User session invalid, clearing local session" }
-                        client.auth.clearSession()
-                    } else {
-                        log.e(e) { "Sign out failed" }
-                    }
+    suspend fun getCurrentSession(): UserSession? {
+        return try {
+            // Пытаемся получить текущую сессию
+            var session = client.auth.currentSessionOrNull()
+
+            // Если сессия есть, но истекла - пробуем обновить
+            session?.let {
+                if (Instant.parse(it.expiresAt.toString()) < Clock.System.now()) {
+                    client.auth.refreshCurrentSession()
+                    session = client.auth.currentSessionOrNull()
                 }
             }
+
+            session
         } catch (e: Exception) {
-            log.e(e) { "Error during sign out attempt" }
+            log.e(e) { "Error getting current session" }
+            null
+        }
+    }
+
+    suspend fun ensureAuthenticated(): Boolean {
+        return try {
+            // Пытаемся получить сессию
+            val session = getCurrentSession()
+
+            if (session == null) {
+                // Пробуем загрузить из хранилища
+                client.auth.loadFromStorage()
+                return client.auth.currentSessionOrNull() != null
+            }
+
+            true
+        } catch (e: Exception) {
+            log.e(e) { "Authentication check failed" }
+            false
+        }
+    }
+
+    internal suspend fun <T> withAuth(block: suspend () -> T): Result<T> {
+        return try {
+            if (!ensureAuthenticated()) {
+                return Result.failure(Exception("User not authenticated"))
+            }
+            Result.success(block())
+        } catch (e: Exception) {
+            log.e(e) { "Error in authenticated operation" }
+            Result.failure(e)
         }
     }
 
@@ -113,24 +125,21 @@ class SupabaseHelper() {
             client.auth.currentSessionOrNull()?.let { session ->
                 if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
                     log.d { "Session expired, signing out" }
-                    safeSignOut()
                 }
             }
         } catch (e: Exception) {
             log.e(e) { "Error checking session validity" }
-            safeSignOut()
         }
     }
 
     sealed class AuthResult {
-        data class Success(val userId: String, val session: UserSession?=null) : AuthResult()
+        data class Success(val userId: String, val session: UserSession? = null) : AuthResult()
         data class Failure(val error: Exception) : AuthResult()
     }
 
     suspend fun signUpWithEmail(email: String, password: String): AuthResult {
 
         return try {
-            safeSignOut()
 
             // 1. Регистрируем пользователя
             client.auth.signUpWith(Email) {
@@ -139,7 +148,7 @@ class SupabaseHelper() {
             }
 
             val currentUser = client.auth.currentUserOrNull()
-            val userId=currentUser?.id.toString()
+            val userId = currentUser?.id.toString()
 
             AuthResult.Success(userId)
         } catch (e: Exception) {
@@ -150,39 +159,51 @@ class SupabaseHelper() {
 
     suspend fun signInWithEmail(email: String, password: String): AuthResult {
         return try {
-            safeSignOut()
-
+            // Выполняем вход
             client.auth.signInWith(Email) {
                 this.email = email
                 this.password = password
             }
+            // Получаем сессию
+            val session = client.auth.currentSessionOrNull()
+                ?: return AuthResult.Failure(Exception("Session not found after login"))
 
-            val currentUser = client.auth.currentUserOrNull()
-            val userId=currentUser?.id.toString()
+            client.auth.sessionManager.saveSession(session)
+            // Получаем ID пользователя
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: return AuthResult.Failure(Exception("User ID not found in session"))
 
-            AuthResult.Success(userId)
+            AuthResult.Success(userId, session)
         } catch (e: Exception) {
-            Logger.e("SupabaseAuth", e) { "Login error" }
             AuthResult.Failure(Exception(mapErrorToUserMessage(e)))
         }
     }
+
+
 
     private fun mapErrorToUserMessage(e: Exception): String {
         return when {
             e.message?.contains("already registered", ignoreCase = true) == true ->
                 "Email уже зарегистрирован"
+
             e.message?.contains("email", ignoreCase = true) == true ->
                 "Неверный формат email"
-            e is java.net.ConnectException ->
+
+            e is ConnectException ->
                 "Нет соединения с сервером"
-            e is java.net.SocketTimeoutException ->
+
+            e is SocketTimeoutException ->
                 "Таймаут соединения"
+
             e.message?.contains("Invalid login credentials") == true ->
                 "Неверный email или пароль"
+
             e is BadRequestRestException ->
                 "Некорректный запрос к серверу"
+
             e is HttpRequestTimeoutException ->
                 "Превышено время ожидания ответа"
+
             else ->
                 "Ошибка: ${e.message ?: "Попробуйте позже"}"
         }
@@ -280,7 +301,7 @@ class SupabaseHelper() {
             val exists = try {
                 client.postgrest.from("profiles")
                     .select(columns = Columns.list("friendship_code")) {
-                        this.filter{
+                        this.filter {
                             eq("friendship_code", code)
                         }
                     }
@@ -292,189 +313,176 @@ class SupabaseHelper() {
         }
     }
 
-    suspend fun getDailyData(date: String): DailyScreenData? = withContext(Dispatchers.IO) {
-        return@withContext try {
-            // Fetch all necessary data in parallel
-            val notes = getDailyNotes(date)
-            val gratitude = getGratitudeJournal(date)
-            val tasks = getDailyTasks(date)
-            val goals = getDailyGoals(date)
-            val ideas = getDailyIdeas(date)
-            val finances = getDailyFinances(date)
 
-            // Transform to DailyScreenData
-            DailyScreenData(
-                date = date,
-                tasks = DailyTasks(
-                    count = tasks.size,
-                    items = tasks,
-                    recommendation = "Plan your day effectively",
-                    emergency = "No emergencies"
-                ),
-                gratitudeJournal = GratitudeJournal(
-                    gratitudeItems = gratitude.mapNotNull { it.gratitude },
-                    joyItems = gratitude.mapNotNull { it.joy }
-                ),
-                notes = DailyNotes(
-                    items = notes.map {
-                        DailyNote(
-                            id = it.id,
-                            userId = it.userId,
-                            date = it.date.toString(),
-                            note = it.note ?: ""
-                        )
+
+    internal suspend fun getDailyNotes(date: String, userId: String): List<DailyNote> {
+        return withAuth {
+            client.postgrest.from("daily_notes")
+                .select {
+                    filter {
+                        eq("date", date)
+                        eq("user_id", userId)
                     }
-                ),
-                goals = DailyGoals(
-                    activeGoals = goals.map { goal ->
-                        GoalProgress(
-                            goal = Goal(
-                                id = goal.id,
-                                userId = goal.userId,
-                                title = goal.title,
-                                description = goal.description,
-                                goalTypeId = goal.goalTypeId,
-                                statusId = goal.statusId,
-                                progressGoal = goal.progressGoal ?: 0.0, // Handle nullable Double
-                                createdAt = goal.createdAt,
-                                achievedAt = goal.achievedAt,
-                                lastUpdated = goal.lastUpdated
-                            ),
-                            progress = goal.progressGoal ?: 0.0 // Use actual progress from goal
-                        )
+                }.decodeList<DailyNote>()
+        }.getOrElse { emptyList() }
+    }
+
+    internal suspend fun getGratitudeJournal(date: String, userId: String): List<GratitudeAndJoyJournal> {
+        return withAuth {
+            client.postgrest.from("gratitude_and_joy_journals")
+                .select {
+                    filter {
+                        eq("date", date)
+                        eq("user_id", userId)
                     }
-                ),
-                ideas = DailyIdeas(
-                    items = ideas.map { idea ->
-                        Idea(
-                            id = idea.id,
-                            userId = idea.userId,
-                            date = idea.date, // Assuming idea.date is already String or convertible
-                            title = idea.title,
-                            description = idea.description
-                        )
-                    }
-                ),
-                finances = DailyFinances(
-                    balance = finances.sumOf { it.amount },
-                    income = finances.filter { it.amount > 0 }.sumOf { it.amount },
-                    expenses = finances.filter { it.amount < 0 }.sumOf { it.amount },
-                    lastTransaction = finances.maxByOrNull { it.date }?.let {
-                        Transaction(
-                            id = 0, // or get actual id if available
-                            userId = "", // or get actual userId
-                            title = it.title ?: "",
-                            description = it.description,
-                            balanceTypeId = null,
-                            amount = it.amount,
-                            date = it.date.toString()
-                        )
-                    }
-                )
-            )
-        } catch (e: Exception) {
-            Logger.e(e) { "Error fetching daily data" }
-            null
-        }
+                }
+                .decodeList<GratitudeAndJoyJournal>()
+        }.getOrElse { emptyList() }
+
     }
 
-    // For daily_notes table (assuming it's in the public schema)
-    private suspend fun getDailyNotes(date: String): List<DailyNote> {
-        return client.postgrest.from("daily.daily_notes")
+    internal suspend fun getDailyTasks(date: String, userId: String): List<Task> {
+        return withAuth { client.postgrest.from("tasks")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    lte("created_at", date)
+                    gte("due_date", date)
+                    eq("user_id", userId)
+                    eq("is_completed", false)
+                }
             }
-            .decodeList()
+            .decodeList<Task>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getGratitudeJournal(date: String): List<GratitudeAndJoyJournal> {
-        return client.postgrest.from("daily.gratitude_and_joy_journals")
+    internal suspend fun getDailyGoals(date: String, userId: String): List<Goal> {
+        return withAuth { client.postgrest.from("goals")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    lte("created_at", date)
+                    neq("status_id", 3) // Not completed
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<Goal>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getDailyTasks(date: String): List<Task> {
-        return client.postgrest.from("tasks.tasks")
+    internal suspend fun getDailyIdeas(date: String, userId: String): List<Idea> {
+        return withAuth { client.postgrest.from("ideas")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<Idea>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getDailyGoals(date: String): List<Goal> {
-        return client.postgrest.from("goals_and_habits.goals")
+    internal suspend fun getDailyFinances(date: String, userId: String): List<Transaction> {
+        return withAuth { client.postgrest.from("transactions")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
+                order("date", Order.DESCENDING)
+
             }
-            .decodeList()
+            .decodeList<Transaction>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getDailyIdeas(date: String): List<Idea> {
-        return client.postgrest.from("daily.ideas")
+
+    internal suspend fun getStepsData(date: String, userId: String): List<Steps> {
+        return withAuth { client.postgrest.from("steps")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<Steps>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getDailyFinances(date: String): List<Transaction> {
-        return client.postgrest.from("finance.transactions")
+    internal suspend fun getWaterIntake(date: String, userId: String): List<WaterIntake> {
+        return withAuth { client.postgrest.from("water_intake")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<WaterIntake>()
+        }.getOrElse { emptyList() }
     }
 
-    suspend fun getHealthDataForDate(date: String): HealthData {
-        return try {
-            val steps = getStepsData(date)
-            val water = getWaterIntake(date)
-            val nutrition = emptyList<NutritionLog>() // Add proper nutrition data if available
-            val activity = getUserActivity(date)
-            val measurements = getBodyMeasurements(date)
-
-            HealthData(steps, water, nutrition, activity, measurements)
-        } catch (e: Exception) {
-            Logger.e(e) { "Error fetching health data" }
-            HealthData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
-        }
-    }
-
-
-    // For health_and_fitness tables (assuming they're in the public schema)
-    private suspend fun getStepsData(date: String): List<Steps> {
-        return client.postgrest.from("health_and_fitness.steps")  // Remove "health_and_fitness." prefix
+    internal suspend fun getNutritionLogs(date: String, userId: String): List<NutritionLog> {
+        return withAuth { client.postgrest.from("nutrition_logs")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<NutritionLog>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getWaterIntake(date: String): List<WaterIntake> {
-        return client.postgrest.from("health_and_fitness.water_intake")  // Remove "health_and_fitness." prefix
+    internal suspend fun getUserActivity(date: String, userId: String): List<UserActivity> {
+        return withAuth { client.postgrest.from("user_activity")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<UserActivity>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getUserActivity(date: String): List<UserActivity> {
-        return client.postgrest.from("health_and_fitness.user_activity")
+    internal suspend fun getBodyMeasurements(date: String, userId: String): List<BodyMeasurement> {
+        return withAuth { client.postgrest.from("body_measurements")
             .select {
-                filter { eq("date", date) }
+                filter {
+                    eq("date", date)
+                    eq("user_id", userId)
+                }
             }
-            .decodeList()
+            .decodeList<BodyMeasurement>()
+        }.getOrElse { emptyList() }
     }
 
-    private suspend fun getBodyMeasurements(date: String): List<BodyMeasurement> {
-        return client.postgrest.from("health_and_fitness.body_measurements")
-            .select {
-                filter { eq("date", date) }
-            }
-            .decodeList()
+    // Получение случайной мотивационной карточки
+    suspend fun getRandomMotivationalCard(): MotivationalCard {
+        return withAuth {
+            // Получаем все мотивационные карточки
+            val allCards = client.postgrest.from("motivational_cards")
+                .select()
+                .decodeList<MotivationalCard>()
+
+            // Выбираем случайную карточку
+            allCards.random()
+        }.getOrThrow()
     }
+
+    // Добавим метод для получения карточки по ID
+    suspend fun getMotivationalCardById(cardId: Int): MotivationalCard {
+        return withAuth {
+            client.postgrest.from("motivational_cards")
+                .select {
+                    filter { eq("id", cardId) }
+                }
+                .decodeSingle<MotivationalCard>()
+        }.getOrThrow()
+    }
+
+
+
+
+
 
 }
 
@@ -494,4 +502,5 @@ class LocalDateSerializer : KSerializer<LocalDate> {
         return LocalDate.parse(decoder.decodeString())
     }
 }
+
 
