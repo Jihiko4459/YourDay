@@ -3,6 +3,7 @@ package com.example.yourday.viewmodel.health_and_fitness
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.model.LocalMealType
 import com.example.yourday.repository.health_and_fitness.MealTypeRepository
@@ -14,7 +15,13 @@ class MealTypeViewModel(application: Application) : AndroidViewModel(application
     val mealTypes: MutableStateFlow<List<LocalMealType>> = MutableStateFlow(emptyList())
 
     init {
-        val db = YourDayDatabase.getDatabase(application)
+        val db by lazy {
+            Room.databaseBuilder(
+                application,//передаем контекст приложения
+                YourDayDatabase::class.java,//и класс бд
+                "notes.db"//название бд
+            ).build()
+        }//создаем объект бд
         repository = MealTypeRepository(db)
         loadMealTypes()
     }

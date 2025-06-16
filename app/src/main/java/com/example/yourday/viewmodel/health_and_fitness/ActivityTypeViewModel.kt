@@ -3,6 +3,7 @@ package com.example.yourday.viewmodel.health_and_fitness
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.model.LocalActivityType
 import com.example.yourday.repository.health_and_fitness.ActivityTypeRepository
@@ -14,7 +15,13 @@ class ActivityTypeViewModel(application: Application) : AndroidViewModel(applica
     val activityTypes: MutableStateFlow<List<LocalActivityType>> = MutableStateFlow(emptyList())
 
     init {
-        val db = YourDayDatabase.Companion.getDatabase(application)
+        val db by lazy {
+            Room.databaseBuilder(
+                application,//передаем контекст приложения
+                YourDayDatabase::class.java,//и класс бд
+                "notes.db"//название бд
+            ).build()
+        }//создаем объект бд
         repository = ActivityTypeRepository(db)
         loadActivityTypes()
     }

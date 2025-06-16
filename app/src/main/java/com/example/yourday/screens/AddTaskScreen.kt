@@ -19,22 +19,36 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.room.Room
 import com.example.yourday.DateTransformation
+import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.model.LocalTask
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskScreen(
-    onTaskCreated: (LocalTask) -> Unit,
+    database: YourDayDatabase, // Добавьте этот параметр
+    onTaskCreated: () -> Unit = {}, // Колбек для уведомления о создании
     modifier: Modifier = Modifier
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     val context = LocalContext.current
+    val database by lazy {
+        Room.databaseBuilder(
+            context,//передаем контекст приложения
+            YourDayDatabase::class.java,//и класс бд
+            "notes.db"//название бд
+        ).build()
+    }
     // You need to implement or provide getUserId function
     val userId = "local_user" // Replace with actual user ID or getUserId implementation
 
@@ -107,11 +121,14 @@ fun AddTaskScreen(
                     title = taskName,
                     description = taskDescription,
                     dueDate = dueDate,
-                    userId = userId, // Add userId
+                    userId = userId,
                     isCompleted = false,
                     createdAt = System.currentTimeMillis()
                 )
-                onTaskCreated(newTask)
+                coroutineScope.launch {
+                    database.taskDao().upsert(newTask)
+                    onTaskCreated() // Уведомляем о создании
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()

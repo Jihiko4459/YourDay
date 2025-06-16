@@ -1,5 +1,5 @@
 [versions]
-agp = "8.10.0"
+agp = "8.10.1"
 kotlin = "2.0.21"
 coreKtx = "1.16.0"
 junit = "4.13.2"
@@ -13,6 +13,7 @@ material = "1.10.0"
 activity = "1.10.1"
 constraintlayout = "2.1.4"
 kotlinKapt = "1.9.20" # Должна совпадать с версией Kotlin
+
 
 
 [libraries]
@@ -36,6 +37,7 @@ material = { group = "com.google.android.material", name = "material", version.r
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 kotlin-kapt = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlinKapt" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

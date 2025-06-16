@@ -1,12 +1,8 @@
 package com.example.yourday.database
 
-import android.content.Context
-import android.util.Log
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.yourday.database.dao.DayOfTheWeekDao
 import com.example.yourday.database.dao.GenderDao
 import com.example.yourday.database.dao.UnitDao
@@ -81,6 +77,8 @@ import com.example.yourday.model.LocalUnit
 import com.example.yourday.model.LocalUserActivity
 import com.example.yourday.model.LocalUserArticleStatus
 import com.example.yourday.model.LocalWaterIntake
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 @Database(
@@ -210,34 +208,6 @@ abstract class YourDayDatabase : RoomDatabase() {
     abstract fun waterIntakeDao(): WaterIntakeDao
 
 
-
-
-    companion object {
-        @Volatile
-        private var INSTANCE: YourDayDatabase? = null
-
-        fun getDatabase(context: Context): YourDayDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    YourDayDatabase::class.java,
-                    "yourday_database"
-                )
-                    .addCallback(object : RoomDatabase.Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            super.onCreate(db)
-                            Log.d("YourDayDatabase", "Database created")
-                        }
-                    })
-                    .fallbackToDestructiveMigration()
-                    .build()
-                INSTANCE = instance
-                instance
-            }
-        }
-
-    }
-
     // Helper functions for initial data loading
     suspend fun loadInitialDays(dao: DayOfTheWeekDao) {
         val initialDays = listOf(
@@ -251,6 +221,17 @@ abstract class YourDayDatabase : RoomDatabase() {
         )
         dao.deleteAll()
         initialDays.forEach { day -> dao.upsert(day) }
+    }
+
+    suspend fun initializeReferenceData() {
+        withContext(Dispatchers.IO) {
+            loadInitialDays(dayOfTheWeekDao())
+            insertAllReferenceGenders(genderDao())
+            addDefaultActivityTypes(activityTypeDao())
+            insertAllReferenceGoalTypes(goalAndHabitTypeDao())
+            insertAllReferenceStatuses(goalStatusDao())
+            insertAllReferenceUnits(unitDao())
+        }
     }
 
     suspend fun insertAllReferenceGenders(dao: GenderDao) {

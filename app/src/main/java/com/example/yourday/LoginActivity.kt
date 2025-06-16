@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.room.Room
 import com.example.yourday.api.SupabaseHelper
 import com.example.yourday.api.SupabaseHelper.AuthResult
 import com.example.yourday.components.GlobalToast
@@ -131,8 +132,13 @@ class LoginActivity : ComponentActivity() {
             }
         }
     }
-    private val database by lazy { YourDayDatabase.getDatabase(this) }
-
+    private val database by lazy {
+        Room.databaseBuilder(
+            applicationContext,//передаем контекст приложения
+            YourDayDatabase::class.java,//и класс бд
+            "notes.db"//название бд
+        ).build()
+    }//создаем объект бд
     private suspend fun handleLogin(email: String, password: String, rememberMe: Boolean) {
         try {
             val result = authHelper.signInWithEmail(email, password)

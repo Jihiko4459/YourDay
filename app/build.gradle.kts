@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization) // Добавьте плагин для Kotlin Serialization
     alias(libs.plugins.kotlin.kapt)
 
+
 }
 
 android {

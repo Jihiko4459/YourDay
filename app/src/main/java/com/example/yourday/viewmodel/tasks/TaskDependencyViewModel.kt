@@ -3,6 +3,7 @@ package com.example.yourday.viewmodel.tasks
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.model.LocalTaskDependency
 import com.example.yourday.repository.tasks.TaskDependencyRepository
@@ -14,7 +15,13 @@ class TaskDependencyViewModel(application: Application) : AndroidViewModel(appli
     val dependencies: MutableStateFlow<List<LocalTaskDependency>> = MutableStateFlow(emptyList())
 
     init {
-        val db = YourDayDatabase.getDatabase(application)
+        val db by lazy {
+            Room.databaseBuilder(
+                application,//передаем контекст приложения
+                YourDayDatabase::class.java,//и класс бд
+                "notes.db"//название бд
+            ).build()
+        }//создаем объект бд
         repository = TaskDependencyRepository(db)
     }
 

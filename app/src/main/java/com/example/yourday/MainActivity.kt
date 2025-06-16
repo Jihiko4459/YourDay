@@ -2,13 +2,17 @@ package com.example.yourday
 
 import CustomDatePicker
 import YourDayTheme
+import android.Manifest
 import android.app.Application
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,6 +36,8 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +47,7 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -61,12 +68,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.room.Room
 import com.example.yourday.api.SupabaseHelper
 import com.example.yourday.database.InitialDataWorker
 import com.example.yourday.database.YourDayDatabase
@@ -74,7 +83,6 @@ import com.example.yourday.factory.daily.IdeaViewModelFactory
 import com.example.yourday.factory.goals_and_habits.GoalViewModelFactory
 import com.example.yourday.factory.health_and_fitness.StepsViewModelFactory
 import com.example.yourday.factory.health_and_fitness.UserActivityViewModelFactory
-import com.example.yourday.factory.health_and_fitness.WaterIntakeViewModelFactory
 import com.example.yourday.factory.tasks.TaskViewModelFactory
 import com.example.yourday.model.LocalGoal
 import com.example.yourday.model.LocalIdea
@@ -85,7 +93,6 @@ import com.example.yourday.repository.daily.IdeaRepository
 import com.example.yourday.repository.goals_and_habits.GoalRepository
 import com.example.yourday.repository.health_and_fitness.StepsRepository
 import com.example.yourday.repository.health_and_fitness.UserActivityRepository
-import com.example.yourday.repository.health_and_fitness.WaterIntakeRepository
 import com.example.yourday.repository.tasks.TaskRepository
 import com.example.yourday.screens.ProfileScreen
 import com.example.yourday.ui.theme.Blue
@@ -98,16 +105,24 @@ import com.example.yourday.viewmodel.daily.IdeaViewModel
 import com.example.yourday.viewmodel.goals_and_habits.GoalViewModel
 import com.example.yourday.viewmodel.health_and_fitness.StepsViewModel
 import com.example.yourday.viewmodel.health_and_fitness.UserActivityViewModel
-import com.example.yourday.viewmodel.health_and_fitness.WaterIntakeViewModel
 import com.example.yourday.viewmodel.tasks.TaskViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Calendar
 
-class MainActivity : ComponentActivity() {
-    private val authHelper by lazy { SupabaseHelper() }
-    private val database by lazy { YourDayDatabase.getDatabase(this) }
 
+class MainActivity : ComponentActivity() {
+    private val REQUEST_ACTIVITY_RECOGNITION_PERMISSION = 1001
+
+
+    private val authHelper by lazy { SupabaseHelper() }
+    private val database by lazy {
+        Room.databaseBuilder(
+            applicationContext,//передаем контекст приложения
+            YourDayDatabase::class.java,//и класс бд
+            "notes.db"//название бд
+        ).build()
+    }//создаем объект бд
 
 
 
@@ -115,6 +130,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+
             YourDayTheme {
 
                 val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
@@ -777,13 +793,63 @@ fun HealthAndFitnessScreen(
     val context = LocalContext.current
     val app = context.applicationContext as Application
 
-    // Инициализация ViewModel для каждой секции
     val viewModelSteps: StepsViewModel = viewModel(
         factory = StepsViewModelFactory(app, StepsRepository(database))
     )
-    val viewModelWater: WaterIntakeViewModel = viewModel(
-        factory = WaterIntakeViewModelFactory(app, WaterIntakeRepository(database))
-    )
+
+    // Состояние для отображения объяснения необходимости разрешения
+    var showPermissionRationale by remember { mutableStateOf(false) }
+
+    // Лончер для запроса разрешения
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModelSteps.startStepTracking()
+        } else {
+            showPermissionRationale = true
+        }
+    }
+
+    // Проверка и запрос разрешения при первом открытии экрана
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModelSteps.startStepTracking()
+        } else {
+            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+    }
+
+    // Диалог объяснения необходимости разрешения
+    if (showPermissionRationale) {
+        AlertDialog(
+            onDismissRequest = { showPermissionRationale = false },
+            title = { Text("Необходимо разрешение") },
+            text = { Text("Для подсчета шагов необходимо разрешение на распознавание активности") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPermissionRationale = false
+                        permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showPermissionRationale = false }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
     val viewModelActivity: UserActivityViewModel = viewModel(
         factory = UserActivityViewModelFactory(app, UserActivityRepository(database))
     )
@@ -792,11 +858,12 @@ fun HealthAndFitnessScreen(
     val userId = getUserId(context)
     val dateStr = convertMillisToDateString(selectedDate)
 
-
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .verticalScroll(rememberScrollState()), // Добавляем вертикальный скролл
-        verticalArrangement = Arrangement.spacedBy(16.dp) ){// Расстояние 6.dp между элементами)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         CustomDatePicker(
             onDateSelected = { millis ->
                 selectedDate = millis
@@ -805,7 +872,7 @@ fun HealthAndFitnessScreen(
                 .fillMaxWidth()
                 .padding(top = 22.dp)
         )
-        // Загружаем данные при изменении даты
+
         LaunchedEffect(dateStr) {
             viewModelSteps.loadStepsByDate(dateStr)
             viewModelActivity.loadActivitiesByDate(dateStr)
@@ -824,7 +891,6 @@ fun HealthAndFitnessScreen(
             supabaseHelper = supabaseHelper,
             activitiesState = viewModelActivity.activities
         )
-
     }
 }
 
@@ -834,16 +900,21 @@ private fun StepsSection(
     date: String,
     userId: String,
     supabaseHelper: SupabaseHelper,
-    stepsState: StateFlow<List<LocalSteps>>
+    stepsState: StateFlow<List<LocalSteps>>,
+    viewModel: StepsViewModel = viewModel() // Добавляем viewModel как параметр
 ) {
+
+
     val steps by stepsState.collectAsState()
     val currentSteps = steps.firstOrNull() ?: LocalSteps(userId = userId, date = date, stepsCount = 0)
-
     val totalSteps = currentSteps.stepsCount
     val targetSteps = 10000
-    val progress = remember(totalSteps) {
-        if (targetSteps > 0) totalSteps.toFloat() / targetSteps else 0f
-    }.coerceIn(0f, 1f)
+    val progress = remember(totalSteps) { (totalSteps.toFloat() / targetSteps).coerceIn(0f, 1f) }
+
+    // Управление жизненным циклом сенсора
+    LaunchedEffect(Unit) {
+        viewModel.startStepTracking()
+    }
 
 
     Card(

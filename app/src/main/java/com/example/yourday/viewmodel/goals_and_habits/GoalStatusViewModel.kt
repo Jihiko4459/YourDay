@@ -3,6 +3,7 @@ package com.example.yourday.viewmodel.goals_and_habits
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.model.LocalGoalStatus
 import com.example.yourday.repository.goals_and_habits.GoalStatusRepository
@@ -14,7 +15,13 @@ class GoalStatusViewModel(application: Application) : AndroidViewModel(applicati
     val goalStatuses: MutableStateFlow<List<LocalGoalStatus>> = MutableStateFlow(emptyList())
 
     init {
-        val db = YourDayDatabase.getDatabase(application)
+        val db by lazy {
+            Room.databaseBuilder(
+                application,//передаем контекст приложения
+                YourDayDatabase::class.java,//и класс бд
+                "notes.db"//название бд
+            ).build()
+        }//создаем объект бд
         repository = GoalStatusRepository(db)
         loadGoalStatuses()
     }

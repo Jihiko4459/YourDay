@@ -3,6 +3,7 @@ package com.example.yourday.viewmodel.content
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.model.LocalArticleStatus
 import com.example.yourday.repository.content.ArticleStatusRepository
@@ -14,7 +15,13 @@ class ArticleStatusViewModel(application: Application) : AndroidViewModel(applic
     val statuses: MutableStateFlow<List<LocalArticleStatus>> = MutableStateFlow(emptyList())
 
     init {
-        val db = YourDayDatabase.getDatabase(application)
+        val db by lazy {
+            Room.databaseBuilder(
+                application,//передаем контекст приложения
+                YourDayDatabase::class.java,//и класс бд
+                "notes.db"//название бд
+            ).build()
+        }//создаем объект бд
         repository = ArticleStatusRepository(db)
         loadStatuses()
     }

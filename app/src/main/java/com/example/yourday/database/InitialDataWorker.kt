@@ -2,6 +2,7 @@ package com.example.yourday.database
 
 import android.content.Context
 import android.util.Log
+import androidx.room.Room
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -19,7 +20,13 @@ class InitialDataWorker(
 
     private val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
     private val KEY_DATA_LOADED = "is_initial_data_loaded"
-    private val database = YourDayDatabase.getDatabase(context)
+    private val database by lazy {
+        Room.databaseBuilder(
+            applicationContext,//передаем контекст приложения
+            YourDayDatabase::class.java,//и класс бд
+            "notes.db"//название бд
+        ).build()
+    }//создаем объект бд
 
     override suspend fun doWork(): Result {
         return try {
