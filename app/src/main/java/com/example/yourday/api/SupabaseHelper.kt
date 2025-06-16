@@ -1,12 +1,16 @@
 package com.example.yourday.api
 
 import co.touchlab.kermit.Logger
+import com.example.yourday.model.Article
+import com.example.yourday.model.ArticleCategory
+import com.example.yourday.model.ArticleInCategory
 import com.example.yourday.model.BodyMeasurement
 import com.example.yourday.model.DailyNote
 import com.example.yourday.model.Goal
 import com.example.yourday.model.GratitudeAndJoyJournal
 import com.example.yourday.model.Idea
 import com.example.yourday.model.MotivationalCard
+import com.example.yourday.model.MotivationalUserCard
 import com.example.yourday.model.NutritionLog
 import com.example.yourday.model.ProfileData
 import com.example.yourday.model.Steps
@@ -17,6 +21,7 @@ import com.example.yourday.model.WaterIntake
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.BadRequestRestException
+import io.github.jan.supabase.exceptions.UnauthorizedRestException
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
@@ -55,11 +60,12 @@ class SupabaseHelper() {
 
         ) {
             install(Auth) {
-                alwaysAutoRefresh = false // Лучше отключить автообновление
+                alwaysAutoRefresh = true // Лучше отключить автообновление
                 autoLoadFromStorage = true // Включить автосохранение
             }
             install(Postgrest) {
                 serializer = KotlinXSerializer()
+
             }
 
 
@@ -71,20 +77,31 @@ class SupabaseHelper() {
 
     suspend fun getCurrentSession(): UserSession? {
         return try {
-            // Пытаемся получить текущую сессию
-            var session = client.auth.currentSessionOrNull()
+            // Получаем текущую сессию (или null)
+            var session = client.auth.currentSessionOrNull() ?: return null
 
-            // Если сессия есть, но истекла - пробуем обновить
-            session?.let {
-                if (Instant.parse(it.expiresAt.toString()) < Clock.System.now()) {
-                    client.auth.refreshCurrentSession()
-                    session = client.auth.currentSessionOrNull()
+            // Если сессия истекла, пытаемся обновить
+            if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
+                try {
+                    // Обновляем сессию (это сохраняет её внутри клиента)
+                    client.auth.refreshCurrentSession() // ⚠️ Возвращает Unit
+
+                    // Получаем обновлённую сессию
+                    session = client.auth.currentSessionOrNull() ?: return null
+
+                    // Явно сохраняем (если нужно)
+                    client.auth.sessionManager.saveSession(session)
+                } catch (e: Exception) {
+                    log.e(e) { "Failed to refresh session" }
+                    // Пробуем загрузить из хранилища
+                    client.auth.loadFromStorage()
+                    session = client.auth.currentSessionOrNull() ?: return null
                 }
             }
 
-            session
+            session // Возвращаем актуальную сессию (или null)
         } catch (e: Exception) {
-            log.e(e) { "Error getting current session" }
+            log.e(e) { "Error in getCurrentSession()" }
             null
         }
     }
@@ -109,13 +126,28 @@ class SupabaseHelper() {
 
     internal suspend fun <T> withAuth(block: suspend () -> T): Result<T> {
         return try {
-            if (!ensureAuthenticated()) {
+            val session = getCurrentSession()
+            if (session == null) {
                 return Result.failure(Exception("User not authenticated"))
             }
             Result.success(block())
         } catch (e: Exception) {
-            log.e(e) { "Error in authenticated operation" }
-            Result.failure(e)
+            when (e) {
+                is UnauthorizedRestException -> {
+                    // Попытка обновить сессию
+                    try {
+                        client.auth.refreshCurrentSession()
+                        Result.success(block())
+                    } catch (refreshEx: Exception) {
+                        log.e(refreshEx) { "Error refreshing session" }
+                        Result.failure(refreshEx)
+                    }
+                }
+                else -> {
+                    log.e(e) { "Error in authenticated operation" }
+                    Result.failure(e)
+                }
+            }
         }
     }
 
@@ -478,6 +510,77 @@ class SupabaseHelper() {
                 .decodeSingle<MotivationalCard>()
         }.getOrThrow()
     }
+
+    suspend fun getArticleCategories(): List<ArticleCategory> {
+        return withAuth {
+            try {
+                println("Fetching article categories from Supabase...")
+                val result = client.postgrest.from("article_categories")
+                    .select()
+                    .decodeList<ArticleCategory>()
+                println("Successfully fetched ${result.size} categories")
+                result
+            } catch (e: Exception) {
+                println("Error fetching categories: ${e.message}")
+                throw e
+            }
+        }.getOrElse { emptyList() }
+    }
+
+    suspend fun getArticleInCategories(): List<ArticleInCategory> {
+        return withAuth {
+            try {
+                println("Fetching article in categories from Supabase...")
+                val result = client.postgrest.from("article_in_categories")
+                    .select()
+                    .decodeList<ArticleInCategory>()
+                println("Successfully fetched ${result.size} article-category relations")
+                result
+            } catch (e: Exception) {
+                println("Error fetching article-category relations: ${e.message}")
+                throw e
+            }
+        }.getOrElse { emptyList() }
+    }
+
+    suspend fun getArticles(): List<Article> {
+        return withAuth {
+            try {
+                println("Fetching articles from Supabase...")
+                val result = client.postgrest.from("articles")
+                    .select()
+                    .decodeList<Article>()
+                println("Successfully fetched ${result.size} articles")
+                result
+            } catch (e: Exception) {
+                println("Error fetching articles: ${e.message}")
+                throw e
+            }
+        }.getOrElse { emptyList() }
+    }
+
+    suspend fun saveMotivationalUserCard(userCard: MotivationalUserCard): Boolean {
+        return try {
+            // First check authentication
+            if (!ensureAuthenticated()) {
+                throw Exception("User not authenticated")
+            }
+
+            // Use withAuth for better error handling
+            withAuth {
+                client.postgrest.from("motivational_user_cards")
+                    .insert(userCard)
+                true
+            }.getOrElse {
+                Logger.e(it) { "Failed to save motivational user card" }
+                false
+            }
+        } catch (e: Exception) {
+            Logger.e(e) { "Error saving motivational user card: ${e.message}" }
+            false
+        }
+    }
+
 
 
 

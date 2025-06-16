@@ -6,4 +6,7 @@
     <string name="title_activity_otpverification">OTPVerificationActivity</string>
     <string name="title_activity_last_step_to_registration">LastStepToRegistration</string>
     <string name="title_activity_user_daily_quote">UserDailyQuoteActivity</string>
+    <string name="title_activity_article_detail">ArticleDetailActivity</string>
+    <string name="title_activity_tasks">TasksActivity</string>
+    <string name="title_activity_task">TaskActivity</string>
 </resources>
