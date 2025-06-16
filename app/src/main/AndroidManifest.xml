@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
 
     <application
         android:allowBackup="true"
@@ -17,9 +19,44 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
-            android:name=".UserDailyQuoteActivity"
+            android:name=".UAActivity"
             android:exported="false"
-            android:label="@string/title_activity_user_daily_quote"
+            android:label="@string/title_activity_uaactivity"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".AddUAActivity"
+            android:exported="false"
+            android:label="@string/title_activity_add_uaactivity"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".IdeaActivity"
+            android:exported="false"
+            android:label="@string/title_activity_idea"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".AddIdeaActivity"
+            android:exported="false"
+            android:label="@string/title_activity_add_idea"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".GoalActivity"
+            android:exported="false"
+            android:label="@string/title_activity_goal"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".AddGoalActivity"
+            android:exported="false"
+            android:label="@string/title_activity_add_goal"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".TaskActivity"
+            android:exported="false"
+            android:label="@string/title_activity_card"
+            android:theme="@style/Theme.YourDay" />
+        <activity
+            android:name=".AddTaskActivity"
+            android:exported="false"
+            android:label="@string/title_activity_add"
             android:theme="@style/Theme.YourDay" />
         <activity
             android:name=".PrivacyPolicyActivity"

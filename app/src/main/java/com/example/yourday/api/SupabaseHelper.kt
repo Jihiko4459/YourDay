@@ -6,7 +6,24 @@ import com.example.yourday.model.DailyNote
 import com.example.yourday.model.Goal
 import com.example.yourday.model.GratitudeAndJoyJournal
 import com.example.yourday.model.Idea
-import com.example.yourday.model.MotivationalCard
+import com.example.yourday.model.LocalBodyMeasurement
+import com.example.yourday.model.LocalChecklistItem
+import com.example.yourday.model.LocalDailyNote
+import com.example.yourday.model.LocalGoal
+import com.example.yourday.model.LocalGratitudeAndJoyJournal
+import com.example.yourday.model.LocalHabit
+import com.example.yourday.model.LocalHobby
+import com.example.yourday.model.LocalIdea
+import com.example.yourday.model.LocalItemMark
+import com.example.yourday.model.LocalMedication
+import com.example.yourday.model.LocalNutritionLog
+import com.example.yourday.model.LocalSteps
+import com.example.yourday.model.LocalTask
+import com.example.yourday.model.LocalTaskDependency
+import com.example.yourday.model.LocalTransaction
+import com.example.yourday.model.LocalUserActivity
+import com.example.yourday.model.LocalUserArticleStatus
+import com.example.yourday.model.LocalWaterIntake
 import com.example.yourday.model.NutritionLog
 import com.example.yourday.model.ProfileData
 import com.example.yourday.model.Steps
@@ -15,6 +32,7 @@ import com.example.yourday.model.Transaction
 import com.example.yourday.model.UserActivity
 import com.example.yourday.model.WaterIntake
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.BadRequestRestException
 import io.github.jan.supabase.gotrue.Auth
@@ -27,7 +45,9 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.serializer.KotlinXSerializer
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.HttpTimeout
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -48,6 +68,8 @@ import kotlin.random.Random
 class SupabaseHelper() {
     private val log = Logger.withTag("SupabaseAuth")
 
+
+    @OptIn(SupabaseInternal::class)
     internal val client: SupabaseClient by lazy {
         createSupabaseClient(
             supabaseUrl = "https://pvlnzygigjnmmsmkrpps.supabase.co",
@@ -60,6 +82,18 @@ class SupabaseHelper() {
             }
             install(Postgrest) {
                 serializer = KotlinXSerializer()
+            }
+            // Добавляем настройки таймаута и ретраев
+            httpConfig {
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 30000 // 30 секунд
+                    connectTimeoutMillis = 30000
+                    socketTimeoutMillis = 30000
+                }
+                install(HttpRequestRetry) {
+                    retryOnException(maxRetries = 3)
+                    exponentialDelay()
+                }
             }
 
 
@@ -120,7 +154,7 @@ class SupabaseHelper() {
     }
 
 
-    suspend fun checkSessionValidity() {
+    fun checkSessionValidity() {
         try {
             client.auth.currentSessionOrNull()?.let { session ->
                 if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
@@ -149,6 +183,12 @@ class SupabaseHelper() {
 
             val currentUser = client.auth.currentUserOrNull()
             val userId = currentUser?.id.toString()
+
+            // Получаем сессию
+            val session = client.auth.currentSessionOrNull()
+                ?: return AuthResult.Failure(Exception("Session not found after login"))
+
+            client.auth.sessionManager.saveSession(session)
 
             AuthResult.Success(userId)
         } catch (e: Exception) {
@@ -314,6 +354,7 @@ class SupabaseHelper() {
     }
 
 
+    //загрузка данных для главного экрана
 
     internal suspend fun getDailyNotes(date: String, userId: String): List<DailyNote> {
         return withAuth {
@@ -455,30 +496,423 @@ class SupabaseHelper() {
         }.getOrElse { emptyList() }
     }
 
-    // Получение случайной мотивационной карточки
-    suspend fun getRandomMotivationalCard(): MotivationalCard {
-        return withAuth {
-            // Получаем все мотивационные карточки
-            val allCards = client.postgrest.from("motivational_cards")
-                .select()
-                .decodeList<MotivationalCard>()
 
-            // Выбираем случайную карточку
-            allCards.random()
-        }.getOrThrow()
+    // Body Measurements
+    suspend fun upsertBodyMeasurement(measurement: LocalBodyMeasurement): Boolean {
+        return try {
+            client.from("body_measurements").upsert(measurement)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting body measurement" }
+            false
+        }
     }
 
-    // Добавим метод для получения карточки по ID
-    suspend fun getMotivationalCardById(cardId: Int): MotivationalCard {
-        return withAuth {
-            client.postgrest.from("motivational_cards")
-                .select {
-                    filter { eq("id", cardId) }
-                }
-                .decodeSingle<MotivationalCard>()
-        }.getOrThrow()
+    suspend fun deleteBodyMeasurement(measurementId: Int): Boolean {
+        return try {
+            client.from("body_measurements").delete {
+                filter { eq("id", measurementId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting body measurement" }
+            false
+        }
     }
 
+    // Checklist Items
+    suspend fun upsertChecklistItem(item: LocalChecklistItem): Boolean {
+        return try {
+            client.from("checklist_items").upsert(item)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting checklist item" }
+            false
+        }
+    }
+
+    suspend fun deleteChecklistItem(itemId: Int): Boolean {
+        return try {
+            client.from("checklist_items").delete {
+                filter { eq("id", itemId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting checklist item" }
+            false
+        }
+    }
+
+    // Daily Notes
+    suspend fun upsertDailyNote(note: LocalDailyNote): Boolean {
+        return try {
+            client.from("daily_notes").upsert(note)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting daily note" }
+            false
+        }
+    }
+
+    suspend fun deleteDailyNote(noteId: Int): Boolean {
+        return try {
+            client.from("daily_notes").delete {
+                filter { eq("id", noteId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting daily note" }
+            false
+        }
+    }
+
+
+    // Goals
+    suspend fun upsertGoal(goal: LocalGoal): Boolean {
+        return try {
+            client.from("goals").upsert(goal)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting goal" }
+            false
+        }
+    }
+
+    suspend fun deleteGoal(goalId: Int): Boolean {
+        return try {
+            client.from("goals").delete {
+                filter { eq("id", goalId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting goal" }
+            false
+        }
+    }
+
+    // Gratitude and Joy Journals
+    suspend fun upsertGratitudeAndJoyJournal(journal: LocalGratitudeAndJoyJournal): Boolean {
+        return try {
+            client.from("gratitude_and_joy_journals").upsert(journal)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting gratitude and joy journal" }
+            false
+        }
+    }
+
+    suspend fun deleteGratitudeAndJoyJournal(journalId: Int): Boolean {
+        return try {
+            client.from("gratitude_and_joy_journals").delete {
+                filter { eq("id", journalId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting gratitude and joy journal" }
+            false
+        }
+    }
+
+    // Habits
+    suspend fun upsertHabit(habit: LocalHabit): Boolean {
+        return try {
+            client.from("habits").upsert(habit)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting habit" }
+            false
+        }
+    }
+
+    suspend fun deleteHabit(habitId: Int): Boolean {
+        return try {
+            client.from("habits").delete {
+                filter { eq("id", habitId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting habit" }
+            false
+        }
+    }
+
+    // Hobbies
+    suspend fun upsertHobby(hobby: LocalHobby): Boolean {
+        return try {
+            client.from("hobbies").upsert(hobby)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting hobby" }
+            false
+        }
+    }
+
+    suspend fun deleteHobby(hobbyId: Int): Boolean {
+        return try {
+            client.from("hobbies").delete {
+                filter { eq("id", hobbyId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting hobby" }
+            false
+        }
+    }
+
+    // Ideas
+    suspend fun upsertIdea(idea: LocalIdea): Boolean {
+        return try {
+            client.from("ideas").upsert(idea)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting idea" }
+            false
+        }
+    }
+
+    suspend fun deleteIdea(ideaId: Int): Boolean {
+        return try {
+            client.from("ideas").delete {
+                filter { eq("id", ideaId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting idea" }
+            false
+        }
+    }
+
+    // Item Marks
+    suspend fun upsertItemMark(mark: LocalItemMark): Boolean {
+        return try {
+            client.from("item_marks").upsert(mark)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting item mark" }
+            false
+        }
+    }
+
+    suspend fun deleteItemMark(markId: Int): Boolean {
+        return try {
+            client.from("item_marks").delete {
+                filter { eq("id", markId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting item mark" }
+            false
+        }
+    }
+
+    // Medications
+    suspend fun upsertMedication(medication: LocalMedication): Boolean {
+        return try {
+            client.from("medications").upsert(medication)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting medication" }
+            false
+        }
+    }
+
+    suspend fun deleteMedication(medicationId: Int): Boolean {
+        return try {
+            client.from("medications").delete {
+                filter { eq("id", medicationId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting medication" }
+            false
+        }
+    }
+
+
+
+    // Nutrition Logs
+    suspend fun upsertNutritionLog(log: LocalNutritionLog): Boolean {
+        return try {
+            client.from("nutrition_logs").upsert(log)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting nutrition log" }
+            false
+        }
+    }
+
+    suspend fun deleteNutritionLog(logId: Int): Boolean {
+        return try {
+            client.from("nutrition_logs").delete {
+                filter { eq("id", logId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting nutrition log" }
+            false
+        }
+    }
+
+    // Steps
+    suspend fun upsertSteps(steps: LocalSteps): Boolean {
+        return try {
+            client.from("steps").upsert(steps)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting steps" }
+            false
+        }
+    }
+
+    suspend fun deleteSteps(stepsId: Int): Boolean {
+        return try {
+            client.from("steps").delete {
+                filter { eq("id", stepsId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting steps" }
+            false
+        }
+    }
+
+    // Task Dependencies
+    suspend fun upsertTaskDependency(dependency: LocalTaskDependency): Boolean {
+        return try {
+            client.from("task_dependencies").upsert(dependency)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting task dependency" }
+            false
+        }
+    }
+
+    suspend fun deleteTaskDependency(dependencyId: Int): Boolean {
+        return try {
+            client.from("task_dependencies").delete {
+                filter { eq("id", dependencyId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting task dependency" }
+            false
+        }
+    }
+
+    // Tasks
+    suspend fun upsertTask(task: LocalTask): Boolean {
+        return try {
+            client.from("tasks").upsert(task)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting task" }
+            false
+        }
+    }
+
+    suspend fun deleteTask(taskId: Int): Boolean {
+        return try {
+            client.from("tasks").delete {
+                filter { eq("id", taskId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting task" }
+            false
+        }
+    }
+
+    // Transactions
+    suspend fun upsertTransaction(transaction: LocalTransaction): Boolean {
+        return try {
+            client.from("transactions").upsert(transaction)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting transaction" }
+            false
+        }
+    }
+
+    suspend fun deleteTransaction(transactionId: Int): Boolean {
+        return try {
+            client.from("transactions").delete {
+                filter { eq("id", transactionId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting transaction" }
+            false
+        }
+    }
+
+    // User Activities
+    suspend fun upsertUserActivity(activity: LocalUserActivity): Boolean {
+        return try {
+            client.from("user_activities").upsert(activity)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting user activity" }
+            false
+        }
+    }
+
+    suspend fun deleteUserActivity(activityId: Int): Boolean {
+        return try {
+            client.from("user_activities").delete {
+                filter { eq("id", activityId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting user activity" }
+            false
+        }
+    }
+
+    // User Article Statuses
+    suspend fun upsertUserArticleStatus(status: LocalUserArticleStatus): Boolean {
+        return try {
+            client.from("user_article_statuses").upsert(status)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting user article status" }
+            false
+        }
+    }
+
+    suspend fun deleteUserArticleStatus(statusId: Int): Boolean {
+        return try {
+            client.from("user_article_statuses").delete {
+                filter { eq("id", statusId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting user article status" }
+            false
+        }
+    }
+
+    // Water Intake
+    suspend fun upsertWaterIntake(intake: LocalWaterIntake): Boolean {
+        return try {
+            client.from("water_intake").upsert(intake)
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error upserting water intake" }
+            false
+        }
+    }
+
+    suspend fun deleteWaterIntake(intakeId: Int): Boolean {
+        return try {
+            client.from("water_intake").delete {
+                filter { eq("id", intakeId) }
+            }
+            true
+        } catch (e: Exception) {
+            Logger.e(e) { "Error deleting water intake" }
+            false
+        }
+    }
 
 
 
@@ -502,5 +936,6 @@ class LocalDateSerializer : KSerializer<LocalDate> {
         return LocalDate.parse(decoder.decodeString())
     }
 }
+
 
 

@@ -200,22 +200,6 @@ data class FoodItem(
     @SerialName("carbs_per_unit") val carbsPerUnit: Double?
 )
 
-// Friends
-@Serializable
-data class Friend(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("friend_id") val friendId: String,
-    @SerialName("status_id") val statusId: Int?,
-    @SerialName("created_at") val createdAt: String
-)
-
-// Friendship Statuses
-@Serializable
-data class FriendshipStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("status_name") val statusName: String
-)
 
 // Genders
 @Serializable
@@ -328,22 +312,6 @@ data class Medication(
     @SerialName("interval") val interval: String?
 )
 
-// Mood Motivational Cards
-@Serializable
-data class MoodMotivationalCard(
-    @SerialName("id") val id: Int,
-    @SerialName("card_id") val cardId: Int?,
-    @SerialName("mood_type_id") val moodTypeId: Int?
-)
-
-// Mood Types
-@Serializable
-data class MoodType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String,
-    @SerialName("icon_type") val iconType: String? = null
-)
-
 // Motivational Cards
 @Serializable
 data class MotivationalCard(
@@ -352,34 +320,6 @@ data class MotivationalCard(
     @SerialName("photo_id") val photoId: Int?
 )
 
-// Motivational User Cards
-@Serializable
-data class MotivationalUserCard(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("card_id") val cardId: Int,
-    @SerialName("date") val date: String
-)
-
-// Notification Types
-@Serializable
-data class NotificationType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String
-)
-
-// Notifications
-@Serializable
-data class Notification(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("initiator_id") val initiatorId: String?,
-    @SerialName("type_id") val typeId: Int?,
-    @SerialName("message") val message: String?,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("is_read") val isRead: Boolean = false,
-    @SerialName("additional_data") val additionalData: String?
-)
 
 // Nutrition Log
 @Serializable
@@ -401,19 +341,6 @@ data class Steps(
     @SerialName("date") val date: String
 )
 
-// Support Tickets
-@Serializable
-data class SupportTicket(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String?,
-    @SerialName("email") val email: String,
-    @SerialName("subject") val subject: String,
-    @SerialName("description") val description: String?,
-    @SerialName("id_status") val idStatus: Int?,
-    @SerialName("id_priority") val idPriority: Int?,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String
-)
 
 // Task Dependencies
 @Serializable
@@ -463,19 +390,6 @@ data class Theme(
     @SerialName("is_default") val isDefault: Boolean = false
 )
 
-// Ticket Priorities
-@Serializable
-data class TicketPriority(
-    @SerialName("id") val id: Int,
-    @SerialName("priority_name") val priorityName: String
-)
-
-// Ticket Statuses
-@Serializable
-data class TicketStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("status_name") val statusName: String
-)
 
 // Transactions
 @Serializable
@@ -516,33 +430,16 @@ data class UserArticleStatus(
     @SerialName("status_changed_at") val statusChangedAt: String
 )
 
-// User Moods
-@Serializable
-data class UserMood(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("mood_type_id") val moodTypeId: Int?,
-    @SerialName("is_shared") val isShared: Boolean = false
-)
 
 // User Settings
 @Serializable
-data class UserSetting(
+data class UserSettings(
     @SerialName("user_id") val userId: String,
-    @SerialName("id_theme") val idTheme: Int?,
-    @SerialName("id_icon") val idIcon: Int?,
+    @SerialName("theme_id") val themeId: Int? = null,
+    @SerialName("app_icon_id") val appIconId: Int? = null,
     @SerialName("created_at") val createdAt: String
 )
 
-// User Wellbeing
-@Serializable
-data class UserWellbeing(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("wellbeing_type_id") val wellbeingTypeId: Int?
-)
 
 // Water Intake
 @Serializable
@@ -552,14 +449,6 @@ data class WaterIntake(
     @SerialName("date") val date: String,
     @SerialName("time") val time: String?,
     @SerialName("amount_ml") val amountMl: Double
-)
-
-// Wellbeing Types
-@Serializable
-data class WellbeingType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String,
-    @SerialName("icon_type") val iconType: String? = null
 )
 
 

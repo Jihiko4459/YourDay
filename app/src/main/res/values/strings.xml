@@ -6,4 +6,19 @@
     <string name="title_activity_otpverification">OTPVerificationActivity</string>
     <string name="title_activity_last_step_to_registration">LastStepToRegistration</string>
     <string name="title_activity_user_daily_quote">UserDailyQuoteActivity</string>
+    <string name="title_activity_task">TaskActivity</string>
+    <string name="title_activity_add">AddActivity</string>
+    <string name="title_activity_card">CardActivity</string>
+    <string name="title_activity_add_gajactivity">AddGAJActivity</string>
+    <string name="title_activity_gajactivity">GAJActivity</string>
+    <string name="title_activity_tasks">TasksActivity</string>
+    <string name="title_activity_add_goal">AddGoalActivity</string>
+    <string name="title_activity_goal">GoalActivity</string>
+    <string name="title_activity_goals">GoalsActivity</string>
+    <string name="title_activity_add_idea">AddIdeaActivity</string>
+    <string name="title_activity_idea">IdeaActivity</string>
+    <string name="title_activity_ideas">IdeasActivity</string>
+    <string name="title_activity_add_uaactivity">AddUAActivity</string>
+    <string name="title_activity_uaactivity">UAActivity</string>
+    <string name="title_activity_uas">UAsActivity</string>
 </resources>

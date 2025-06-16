@@ -48,6 +48,10 @@ val room_version = "2.6.1" // всегда бери последнюю стаб�
 dependencies {
 
 
+
+    // WorkManager с поддержкой Kotlin Coroutines
+    implementation("androidx.work:work-runtime-ktx:2.9.0")  // Последняя версия на момент 2025
+
     //библиотека Coil для загрузки изображений по URL
     implementation("io.coil-kt:coil-compose:2.4.0") // Последняя версия Coil
 
@@ -56,6 +60,7 @@ dependencies {
     // Дополнительно - поддержка Kotlin корутин для Room
     implementation("androidx.room:room-ktx:$room_version")
     kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-rxjava2:$room_version")
 
 
     // Coroutines

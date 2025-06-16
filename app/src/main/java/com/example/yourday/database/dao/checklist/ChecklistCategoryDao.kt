@@ -2,20 +2,15 @@ package com.example.yourday.database.dao.checklist
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Update
+import androidx.room.Upsert
 import com.example.yourday.model.LocalChecklistCategory
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ChecklistCategoryDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(category: LocalChecklistCategory)
-
-    @Update
-    suspend fun update(category: LocalChecklistCategory)
+    @Upsert
+    suspend fun upsert(category: LocalChecklistCategory)
 
     @Delete
     suspend fun delete(category: LocalChecklistCategory)
@@ -23,6 +18,12 @@ interface ChecklistCategoryDao {
     @Query("SELECT * FROM checklist_categories")
     fun getAll(): Flow<List<LocalChecklistCategory>>
 
-    @Query("SELECT * FROM checklist_categories WHERE isSynced = 0")
-    suspend fun getUnsynced(): List<LocalChecklistCategory>
+    @Query("SELECT * FROM checklist_categories WHERE id = :id")
+    suspend fun getById(id: Int): LocalChecklistCategory?
+
+
+    // Новый метод для очистки таблицы
+    @Query("DELETE FROM checklist_categories")
+    suspend fun deleteAll()
+
 }

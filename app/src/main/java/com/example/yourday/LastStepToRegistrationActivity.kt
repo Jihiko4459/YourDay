@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -69,6 +70,8 @@ import com.example.yourday.api.SupabaseHelper
 import com.example.yourday.components.GlobalToast
 import com.example.yourday.components.ToastManager
 import com.example.yourday.components.ToastType
+import com.example.yourday.database.InitialDataWorker
+import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.ui.theme.Black
 import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Gray1
@@ -126,6 +129,8 @@ class LastStepToRegistrationActivity : ComponentActivity() {
         }
     }
 
+    private val database by lazy { YourDayDatabase.getDatabase(this) }
+
     private fun handleProfileUpdate(userId: String, nickname: String, birthDate: String, termsAccepted: Boolean) {
         lifecycleScope.launch {
             if (!termsAccepted) {
@@ -146,8 +151,7 @@ class LastStepToRegistrationActivity : ComponentActivity() {
                 )
 
                 if (success) {
-
-
+                    reloadInitialData(this as Context)
                     navigateToMain(userId)
                 } else {
                     ToastManager.show("Ошибка сохранения профиля", ToastType.ERROR)
@@ -544,5 +548,13 @@ class DateTransformation : VisualTransformation {
 
         return TransformedText(AnnotatedString(out), offsetMapping)
     }
+}
+fun reloadInitialData(context: Context) {
+    val sharedPref = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    if (!sharedPref.getBoolean("is_initial_data_loaded", false)) {
+        InitialDataWorker.enqueue(context)
+        sharedPref.edit().putBoolean("is_initial_data_loaded", true).apply()
+    }
+    Toast.makeText(context, "Загрузка данных начата...", Toast.LENGTH_SHORT).show()
 }
 

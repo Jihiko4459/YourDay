@@ -66,6 +66,7 @@ import com.example.yourday.api.SupabaseHelper.AuthResult
 import com.example.yourday.components.GlobalToast
 import com.example.yourday.components.ToastManager
 import com.example.yourday.components.ToastType
+import com.example.yourday.database.YourDayDatabase
 import com.example.yourday.ui.theme.Black
 import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Gray1
@@ -130,6 +131,7 @@ class LoginActivity : ComponentActivity() {
             }
         }
     }
+    private val database by lazy { YourDayDatabase.getDatabase(this) }
 
     private suspend fun handleLogin(email: String, password: String, rememberMe: Boolean) {
         try {
@@ -145,6 +147,9 @@ class LoginActivity : ComponentActivity() {
                             .putString("USER_ID", result.userId)
                             .apply()
                     }
+
+
+                    reloadInitialData(this)
 
                     authHelper.updateUserProfile(result.userId)
                     intentToMainActivity()
