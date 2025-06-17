@@ -66,12 +66,7 @@ class SupabaseHelper() {
             }
             install(Postgrest) {
                 serializer = KotlinXSerializer()
-                defaultSchema="public"
             }
-
-
-
-
         }
 
     }
