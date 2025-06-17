@@ -10,11 +10,12 @@ import com.example.yourday.model.Goal
 import com.example.yourday.model.GratitudeAndJoyJournal
 import com.example.yourday.model.Idea
 import com.example.yourday.model.MotivationalCard
-import com.example.yourday.model.MotivationalUserCard
 import com.example.yourday.model.NutritionLog
 import com.example.yourday.model.ProfileData
 import com.example.yourday.model.Steps
 import com.example.yourday.model.Task
+import com.example.yourday.model.TaskPriorityType
+import com.example.yourday.model.TaskType
 import com.example.yourday.model.Transaction
 import com.example.yourday.model.UserActivity
 import com.example.yourday.model.WaterIntake
@@ -65,7 +66,7 @@ class SupabaseHelper() {
             }
             install(Postgrest) {
                 serializer = KotlinXSerializer()
-
+                defaultSchema="public"
             }
 
 
@@ -126,22 +127,38 @@ class SupabaseHelper() {
 
     internal suspend fun <T> withAuth(block: suspend () -> T): Result<T> {
         return try {
-            val session = getCurrentSession()
+            // First try to get current session
+            var session = client.auth.currentSessionOrNull()
+
+            // If no session, try to load from storage
+            if (session == null) {
+                client.auth.loadFromStorage()
+                session = client.auth.currentSessionOrNull()
+            }
+
+            // If still no session, return failure
             if (session == null) {
                 return Result.failure(Exception("User not authenticated"))
             }
+
+            // Check if session is expired
+            if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
+                try {
+                    // Try to refresh session
+                    client.auth.refreshCurrentSession()
+                    session = client.auth.currentSessionOrNull()
+                        ?: return Result.failure(Exception("Failed to refresh session"))
+                } catch (e: Exception) {
+                    return Result.failure(Exception("Session expired and couldn't be refreshed"))
+                }
+            }
+
+            // Now execute the operation
             Result.success(block())
         } catch (e: Exception) {
             when (e) {
                 is UnauthorizedRestException -> {
-                    // Попытка обновить сессию
-                    try {
-                        client.auth.refreshCurrentSession()
-                        Result.success(block())
-                    } catch (refreshEx: Exception) {
-                        log.e(refreshEx) { "Error refreshing session" }
-                        Result.failure(refreshEx)
-                    }
+                    Result.failure(Exception("Authentication required"))
                 }
                 else -> {
                     log.e(e) { "Error in authenticated operation" }
@@ -559,27 +576,79 @@ class SupabaseHelper() {
         }.getOrElse { emptyList() }
     }
 
-    suspend fun saveMotivationalUserCard(userCard: MotivationalUserCard): Boolean {
-        return try {
-            // First check authentication
-            if (!ensureAuthenticated()) {
-                throw Exception("User not authenticated")
-            }
-
-            // Use withAuth for better error handling
-            withAuth {
-                client.postgrest.from("motivational_user_cards")
-                    .insert(userCard)
-                true
-            }.getOrElse {
-                Logger.e(it) { "Failed to save motivational user card" }
-                false
-            }
-        } catch (e: Exception) {
-            Logger.e(e) { "Error saving motivational user card: ${e.message}" }
-            false
-        }
+    // First, let's add these functions to SupabaseHelper for task operations
+    suspend fun getTaskById(taskId: Int, userId: String): Task {
+        return withAuth {
+            client.postgrest.from("tasks")
+                .select {
+                    filter {
+                        eq("id", taskId)
+                        eq("user_id", userId)
+                    }
+                }
+                .decodeSingle<Task>()
+        }.getOrThrow()
     }
+
+    suspend fun saveTask(task: Task): Task {
+        return withAuth {
+            // Get current user ID
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: throw Exception("User not authenticated")
+
+            // Ensure the task belongs to this user
+            val taskToSave = task.copy(userId = userId)
+
+            if (task.id == 0) {
+                client.postgrest.from("tasks")
+                    .insert(taskToSave)
+                    .decodeSingle<Task>()
+            } else {
+                client.postgrest.from("tasks")
+                    .update(taskToSave) {
+                        filter {
+                            eq("id", task.id)
+                            eq("user_id", userId) // Ensure we only update user's own tasks
+                        }
+                    }
+                    .decodeSingle<Task>()
+            }
+        }.getOrThrow()
+    }
+
+    suspend fun deleteTask(taskId: Int): Boolean {
+        return withAuth {
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: throw Exception("User not authenticated")
+
+            client.postgrest.from("tasks")
+                .delete {
+                    filter {
+                        eq("id", taskId)
+                        eq("user_id", userId) // Ensure we only delete user's own tasks
+                    }
+                }
+            true
+        }.getOrThrow()
+    }
+
+    suspend fun getTaskTypes(): List<TaskType> {
+        return withAuth {
+            client.postgrest.from("task_types")
+                .select()
+                .decodeList<TaskType>()
+        }.getOrElse { emptyList() }
+    }
+
+    suspend fun getTaskPriorities(): List<TaskPriorityType> {
+        return withAuth {
+            client.postgrest.from("task_priority_types")
+                .select()
+                .decodeList<TaskPriorityType>()
+        }.getOrElse { emptyList() }
+    }
+
+
 
 
 

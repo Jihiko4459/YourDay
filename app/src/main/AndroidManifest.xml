@@ -22,11 +22,6 @@
             android:label="@string/title_activity_task"
             android:theme="@style/Theme.YourDay" />
         <activity
-            android:name=".TasksActivity"
-            android:exported="false"
-            android:label="@string/title_activity_tasks"
-            android:theme="@style/Theme.YourDay" />
-        <activity
             android:name=".ArticleDetailActivity"
             android:exported="false"
             android:label="@string/title_activity_article_detail"

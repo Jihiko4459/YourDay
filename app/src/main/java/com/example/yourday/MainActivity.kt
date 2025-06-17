@@ -2,8 +2,6 @@ package com.example.yourday
 
 import CustomDatePicker
 import YourDayTheme
-import android.content.Context
-import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -141,8 +139,13 @@ class MainActivity : ComponentActivity() {
                         ) {
                             composable("main") {
                                 MainScreen(
-                                    onIntentToNotification = {},
-                                    supabaseHelper = authHelper
+                                    supabaseHelper = authHelper,
+                                    onTaskClick = { taskId ->
+                                        val intent = Intent(this@MainActivity, TaskActivity::class.java).apply {
+                                            putExtra("taskId", taskId)
+                                        }
+                                        startActivity(intent)
+                                    }
                                 )
                             }
                             composable("articles") { ArticlesScreen(
@@ -155,7 +158,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }) }
                             composable("profile") { ProfileScreen() }
-                            composable("daily") { DailyScreen(authHelper) }
+                            composable("daily") {
+                                DailyScreen(
+                                    supabaseHelper = authHelper,
+                                    onTaskClick ={ taskId ->
+                                        val intent = Intent(this@MainActivity, TaskActivity::class.java).apply {
+                                            putExtra("taskId", taskId)
+                                        }
+                                        startActivity(intent)
+                                    }
+                                )
+                            }
                             composable("health_and_fitness") { HealthAndFitnessScreen(authHelper) }
                         }
 
@@ -176,8 +189,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(
-    onIntentToNotification:()-> Unit,
-    supabaseHelper: SupabaseHelper // Add this parameter
+    supabaseHelper: SupabaseHelper,
+    onTaskClick: (Int) -> Unit
 ) {
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -205,7 +218,8 @@ fun MainScreen(
             // Вызываем наш компонент с навигацией
             NavigationWithCustomMenu(
                 navController = navController,
-                supabaseHelper = supabaseHelper
+                supabaseHelper = supabaseHelper,
+                onTaskClick = onTaskClick
             )
 
 
@@ -214,7 +228,11 @@ fun MainScreen(
     }
 }
 @Composable
-fun NavigationWithCustomMenu(navController: NavHostController, supabaseHelper: SupabaseHelper) {
+fun NavigationWithCustomMenu(
+    navController: NavHostController,
+    supabaseHelper: SupabaseHelper,
+    onTaskClick: (Int) -> Unit
+) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -297,7 +315,12 @@ fun NavigationWithCustomMenu(navController: NavHostController, supabaseHelper: S
             startDestination = "daily",
             modifier = Modifier.weight(1f)
         ) {
-            composable("daily") { DailyScreen(supabaseHelper) }
+            composable("daily") {
+                DailyScreen(
+                    supabaseHelper = supabaseHelper,
+                    onTaskClick = onTaskClick
+                )
+            }
             composable("health_and_fitness") { HealthAndFitnessScreen(supabaseHelper) }
         }
     }
@@ -308,22 +331,22 @@ fun NavigationWithCustomMenu(navController: NavHostController, supabaseHelper: S
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DailyScreen(
-    supabaseHelper: SupabaseHelper
+    supabaseHelper: SupabaseHelper,
+    onTaskClick: (Int) -> Unit
 ) {
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
     val userId = getUserId(context)
     val dateStr = convertMillisToDateString(selectedDate)
 
-
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .verticalScroll(rememberScrollState()), // Добавляем вертикальный скролл
-        verticalArrangement = Arrangement.spacedBy(6.dp) ){// Расстояние 6.dp между элементами)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         CustomDatePicker(
-            onDateSelected = { millis ->
-                selectedDate = millis
-            },
+            onDateSelected = { millis -> selectedDate = millis },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 22.dp)
@@ -333,17 +356,16 @@ fun DailyScreen(
             modifier = Modifier.padding(top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TasksSection(dateStr, userId, supabaseHelper)
+            TasksSection(
+                dateStr,
+                userId,
+                supabaseHelper,
+                onTaskClick = onTaskClick
+            )
             GoalsSection(dateStr, userId, supabaseHelper)
             IdeasSection(dateStr, userId, supabaseHelper)
         }
     }
-}
-
-
-private fun getUserId(context: Context): String {
-    val sharedPref = context.getSharedPreferences("authorization", MODE_PRIVATE)
-    return sharedPref.getString("USER_ID", "") ?: ""
 }
 
 
@@ -357,7 +379,13 @@ private fun convertMillisToDateString(millis: Long): String {
 }
 
 @Composable
-private fun TasksSection(date: String, userId: String, supabaseHelper: SupabaseHelper,) {
+private fun TasksSection(
+    date: String,
+    userId: String,
+    supabaseHelper: SupabaseHelper,
+    onTaskClick: (Int) -> Unit
+) {
+    val context = LocalContext.current
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -391,9 +419,7 @@ private fun TasksSection(date: String, userId: String, supabaseHelper: SupabaseH
                 Row(
                     modifier = Modifier,
                     verticalAlignment = Alignment.CenterVertically
-
                 ) {
-                    // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
                     Icon(
                         painter = painterResource(id = R.drawable.task_ic),
                         contentDescription = "Задачи",
@@ -412,7 +438,11 @@ private fun TasksSection(date: String, userId: String, supabaseHelper: SupabaseH
                 }
 
                 IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
+                    onClick = {
+                        val intent = Intent(context, TaskActivity::class.java)
+                        context.startActivity(intent)
+                    }
+                ) {
                     Icon(
                         painter = painterResource(id = R.drawable.add_ic),
                         contentDescription = "Добавить задачу",
@@ -425,8 +455,8 @@ private fun TasksSection(date: String, userId: String, supabaseHelper: SupabaseH
             when {
                 isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                 error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
-                tasks.isEmpty() ->Text(
-                    text = "Внимание! Сегодня обнаружено: 0 задач.\nРекомендуется: чай, плед, любимый сериал.\nЧрезвычайная ситуация: полный релакс.",
+                tasks.isEmpty() -> Text(
+                    text = "Внимание! Обнаружено: 0 задач.\nРекомендуется: чай, плед, любимый сериал.\nСитуация: полный релакс.",
                     style = TextStyle(
                         fontSize = 16.sp,
                         fontFamily = FontFamily(Font(R.font.roboto_regular)),
@@ -436,42 +466,41 @@ private fun TasksSection(date: String, userId: String, supabaseHelper: SupabaseH
                     modifier = Modifier.fillMaxWidth().padding(top=6.dp)
                 )
                 else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    tasks.forEach { task -> TaskItem(task) }
+                    tasks.forEach { task ->
+                        TaskItem(
+                            task = task,
+                            onClick = { onTaskClick(task.id) }
+                        )
+                    }
                 }
             }
-            Row(
+            Spacer(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.more_ic),
-                        contentDescription = "Перейти на расширенный список",
-                        modifier = Modifier.size(24.dp),
-                        tint = Primary
-                    )
-                }
-            }
+                    .fillMaxWidth()
+                    .height(24.dp)
+            )
         }
     }
 }
 
 
 
+
 @Composable
-private fun TaskItem(task: Task) {
+private fun TaskItem(
+    task: Task,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp)
+            .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconToggleButton(
             checked = task.isCompleted,
-            onCheckedChange = { /* Обработка изменения статуса */ }
+            onCheckedChange = { /* Handle completion status change */ }
         ) {
             Image(
                 painter = painterResource(
@@ -480,7 +509,7 @@ private fun TaskItem(task: Task) {
                 ),
                 contentDescription = if (task.isCompleted) "Checked" else "Unchecked",
                 modifier = Modifier.size(24.dp),
-                colorFilter = null // Отключаем стандартный tint
+                colorFilter = null
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -584,22 +613,11 @@ private fun GoalsSection(date: String, userId: String, supabaseHelper: SupabaseH
                     goals.forEach { goal -> GoalItem(goal) }
                 }
             }
-            Row(
+            Spacer(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.more_ic),
-                        contentDescription = "Перейти на расширенный список",
-                        modifier = Modifier.size(24.dp),
-                        tint = Primary
-                    )
-                }
-            }
+                    .fillMaxWidth()
+                    .height(24.dp)
+            )
         }
     }
 }
@@ -733,22 +751,11 @@ private fun IdeasSection(date: String, userId: String, supabaseHelper: SupabaseH
                     ideas.forEach { idea -> IdeaItem(idea) }
                 }
             }
-            Row(
+            Spacer(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.more_ic),
-                        contentDescription = "Перейти на расширенный список",
-                        modifier = Modifier.size(24.dp),
-                        tint = Primary
-                    )
-                }
-            }
+                    .fillMaxWidth()
+                    .height(24.dp)
+            )
         }
     }
 }
@@ -1109,22 +1116,11 @@ private fun ActivitySection(date: String, userId: String, supabaseHelper: Supaba
                     activities.forEach { activity -> ActivityItem(activity) }
                 }
             }
-            Row(
+            Spacer(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.more_ic),
-                        contentDescription = "Перейти на расширенный список",
-                        modifier = Modifier.size(24.dp),
-                        tint = Primary
-                    )
-                }
-            }
+                    .fillMaxWidth()
+                    .height(24.dp)
+            )
         }
     }
 }
