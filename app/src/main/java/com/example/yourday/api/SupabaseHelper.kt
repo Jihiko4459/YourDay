@@ -47,9 +47,14 @@ import java.util.Locale
 import kotlin.random.Random
 
 
+/**
+ * Вспомогательный класс для работы с Supabase.
+ * Обеспечивает аутентификацию, управление сессиями и взаимодействие с базой данных.
+ */
 class SupabaseHelper(private val context: Context) {
     private val log = Logger.withTag("SupabaseAuth")
 
+    // Ленивая инициализация клиента Supabase
     internal val client: SupabaseClient by lazy {
         createSupabaseClient(
             supabaseUrl = "https://pvlnzygigjnmmsmkrpps.supabase.co",
@@ -58,25 +63,30 @@ class SupabaseHelper(private val context: Context) {
         ) {
 
             install(Auth) {
-                alwaysAutoRefresh = true // Лучше отключить автообновление
-                autoLoadFromStorage = true // Включить автосохранение
+                alwaysAutoRefresh = true // Автоматическое обновление сессии
+                autoLoadFromStorage = true // Загрузка сессии из хранилища
             }
             install(Postgrest) {
                 serializer = KotlinXSerializer(json = Json {
-                    ignoreUnknownKeys = true
-                    coerceInputValues = true
+                    ignoreUnknownKeys = true // Игнорирование неизвестных ключей
+                    coerceInputValues = true // Приведение входных значений
                 })
                 }
         }
 
     }
 
+    /**
+     * Получает текущую сессию пользователя.
+     * Если сессия истекла, пытается обновить её.
+     * @return Текущая сессия или null, если сессия отсутствует или недействительна.
+     */
     suspend fun getCurrentSession(): UserSession? {
         return try {
-            // Получаем текущую сессию (или null)
+            // Получение текущей сессии (или null)
             var session = client.auth.currentSessionOrNull() ?: return null
 
-            // Если сессия истекла, пытаемся обновить
+            // Проверка истечения срока действия сессии
             if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
                 try {
                     // Обновляем сессию (это сохраняет её внутри клиента)
@@ -102,6 +112,10 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Проверяет, аутентифицирован ли пользователь.
+     * @return true, если пользователь аутентифицирован, иначе false.
+     */
     suspend fun ensureAuthenticated(): Boolean {
         return try {
             // Пытаемся получить сессию
@@ -120,6 +134,11 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Выполняет операцию с проверкой аутентификации.
+     * @param block Блок кода для выполнения.
+     * @return Результат операции или ошибка.
+     */
     internal suspend fun <T> withAuth(block: suspend () -> T): Result<T> {
         return try {
             // 1. Проверяем соединение с интернетом
@@ -147,13 +166,20 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+
+    /**
+     * Проверяет доступность сети.
+     * @return true, если сеть доступна, иначе false.
+     */
     private fun isNetworkAvailable(): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val networkInfo = connectivityManager.activeNetworkInfo
         return networkInfo != null && networkInfo.isConnected
     }
 
-
+    /**
+     * Проверяет валидность текущей сессии.
+     */
     suspend fun checkSessionValidity() {
         try {
             client.auth.currentSessionOrNull()?.let { session ->
@@ -166,11 +192,21 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Результат аутентификации.
+     */
     sealed class AuthResult {
         data class Success(val userId: String, val session: UserSession? = null) : AuthResult()
         data class Failure(val error: Exception) : AuthResult()
     }
 
+
+    /**
+     * Регистрирует пользователя по email и паролю.
+     * @param email Email пользователя.
+     * @param password Пароль пользователя.
+     * @return Результат регистрации (успех или ошибка).
+     */
     suspend fun signUpWithEmail(email: String, password: String): AuthResult {
 
         return try {
@@ -191,6 +227,14 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Выполняет операцию с повторными попытками.
+     * @param maxRetries Максимальное количество попыток.
+     * @param initialDelay Начальная задержка между попытками.
+     * @param maxDelay Максимальная задержка между попытками.
+     * @param block Блок кода для выполнения.
+     * @return Результат операции или ошибка.
+     */
     suspend fun <T> withRetry(
         maxRetries: Int = 3,
         initialDelay: Long = 1000,
@@ -218,6 +262,12 @@ class SupabaseHelper(private val context: Context) {
         return Result.failure(Exception("Max retries exceeded"))
     }
 
+    /**
+     * Вход пользователя по email и паролю.
+     * @param email Email пользователя.
+     * @param password Пароль пользователя.
+     * @return Результат входа (успех или ошибка).
+     */
     suspend fun signInWithEmail(email: String, password: String): AuthResult {
         return withRetry {
             try {
@@ -244,7 +294,11 @@ class SupabaseHelper(private val context: Context) {
     }
 
 
-
+    /**
+     * Преобразует ошибку в понятное сообщение для пользователя.
+     * @param e Исключение.
+     * @return Сообщение об ошибке.
+     */
     private fun mapErrorToUserMessage(e: Exception): String {
         return when {
             e.message?.contains("already registered", ignoreCase = true) == true ->
@@ -274,6 +328,15 @@ class SupabaseHelper(private val context: Context) {
     }
 
 
+    /**
+     * Добавляет профиль пользователя.
+     * @param userId ID пользователя.
+     * @param username Имя пользователя.
+     * @param birthDate Дата рождения в формате "ddMMyyyy".
+     * @param genderId ID пола (опционально).
+     * @param avatarUrl URL аватара (опционально).
+     * @return true, если профиль добавлен успешно, иначе false.
+     */
     suspend fun insertUserProfile(
         userId: String,
         username: String,
@@ -307,6 +370,16 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+
+    /**
+     * Обновляет профиль пользователя.
+     * @param userId ID пользователя.
+     * @param username Новое имя пользователя (опционально).
+     * @param birthDate Новая дата рождения в формате "ddMMyyyy" (опционально).
+     * @param genderId Новый ID пола (опционально).
+     * @param avatarUrl Новый URL аватара (опционально).
+     * @return true, если профиль обновлён успешно, иначе false.
+     */
     suspend fun updateUserProfile(
         userId: String,
         username: String? = null,
@@ -354,11 +427,19 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Возвращает текущую дату и время в формате "yyyy-MM-dd HH:mm:ss".
+     * @return Строка с датой и временем.
+     */
     private fun getCurrentDateTime(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
         return sdf.format(Date())
     }
 
+    /**
+     * Генерирует уникальный код дружбы.
+     * @return Уникальный код.
+     */
     private suspend fun generateUniqueFriendshipCode(): String {
         while (true) {
             val code = Random.nextInt(100000000, 999999999).toString()
@@ -378,7 +459,12 @@ class SupabaseHelper(private val context: Context) {
     }
 
 
-
+    /**
+     * Получает задачи на указанную дату.
+     * @param date Дата в формате строки.
+     * @param userId ID пользователя.
+     * @return Список задач.
+     */
     internal suspend fun getDailyTasks(date: String, userId: String): List<Task> {
         return withAuth {
             client.postgrest.from("tasks")
@@ -393,12 +479,18 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает цели на указанную дату.
+     * @param date Дата в формате строки.
+     * @param userId ID пользователя.
+     * @return Список целей.
+     */
     internal suspend fun getDailyGoals(date: String, userId: String): List<Goal> {
         return withAuth { client.postgrest.from("goals")
             .select {
                 filter {
                     lte("created_at", date)
-                    neq("status_id", 3) // Not completed
+                    neq("status_id", 3) // Не завершённые
                     eq("user_id", userId)
                 }
             }
@@ -406,6 +498,12 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает идеи на указанную дату.
+     * @param date Дата в формате строки.
+     * @param userId ID пользователя.
+     * @return Список идей.
+     */
     internal suspend fun getDailyIdeas(date: String, userId: String): List<Idea> {
         return withAuth { client.postgrest.from("ideas")
             .select {
@@ -418,6 +516,12 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает данные о шагах на указанную дату.
+     * @param date Дата в формате строки.
+     * @param userId ID пользователя.
+     * @return Список данных о шагах.
+     */
     internal suspend fun getStepsData(date: String, userId: String): List<Steps> {
         return withAuth { client.postgrest.from("steps")
             .select {
@@ -430,6 +534,12 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает активность пользователя на указанную дату.
+     * @param date Дата в формате строки.
+     * @param userId ID пользователя.
+     * @return Список активностей.
+     */
     internal suspend fun getUserActivity(date: String, userId: String): List<UserActivity> {
         return withAuth { client.postgrest.from("user_activity")
             .select {
@@ -442,6 +552,10 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает категории статей.
+     * @return Список категорий.
+     */
     suspend fun getArticleCategories(): List<ArticleCategory> {
         return withAuth {
             try {
@@ -458,6 +572,10 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает статьи в категориях.
+     * @return Список связей статей и категорий.
+     */
     suspend fun getArticleInCategories(): List<ArticleInCategory> {
         return withAuth {
             try {
@@ -474,6 +592,10 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает все статьи.
+     * @return Список статей.
+     */
     suspend fun getArticles(): List<Article> {
         return withAuth {
             try {
@@ -489,6 +611,13 @@ class SupabaseHelper(private val context: Context) {
             }
         }.getOrElse { emptyList() }
     }
+
+    /**
+     * Получает статью по ID.
+     * @param articleId ID статьи.
+     * @return Статья.
+     * @throws NoSuchElementException Если статья не найдена.
+     */
     suspend fun getArticleById(articleId: Int): Article {
         return withAuth {
             try {
@@ -514,9 +643,14 @@ class SupabaseHelper(private val context: Context) {
         }.getOrThrow()
     }
 
-    // First, let's add these functions to SupabaseHelper for task operations
-    suspend fun getTaskById(taskId: Int, userId: String): Task {
-        return withAuth {
+    /**
+     * Получает задачу по ID.
+     * @param taskId ID задачи.
+     * @param userId ID пользователя.
+     * @return Задача или null, если не найдена.
+     */
+    suspend fun getTaskById(taskId: Int, userId: String): Task? {
+        return try {
             client.postgrest.from("tasks")
                 .select {
                     filter {
@@ -525,9 +659,17 @@ class SupabaseHelper(private val context: Context) {
                     }
                 }
                 .decodeSingle<Task>()
-        }.getOrThrow()
+        } catch (e: Exception) {
+            Logger.e(e) { "Error getting task by ID $taskId" }
+            null
+        }
     }
-
+    /**
+     * Сохраняет задачу.
+     * @param task Задача для сохранения.
+     * @return Сохранённая задача.
+     * @throws Exception Если пользователь не аутентифицирован или произошла ошибка.
+     */
     suspend fun saveTask(task: Task): Task {
         return withAuth {
             log.d { "Attempting to save task: $task" }
@@ -537,7 +679,6 @@ class SupabaseHelper(private val context: Context) {
                     log.e { "User not authenticated when saving task" }
                 }
 
-            // Ensure all date fields are properly formatted
             val taskToSave = task.copy(
                 userId = userId,
                 createdAt = if (task.createdAt.isBlank()) getCurrentDate() else task.createdAt,
@@ -552,7 +693,7 @@ class SupabaseHelper(private val context: Context) {
                     log.d { "Inserting new task" }
                     client.postgrest.from("tasks")
                         .insert(taskToSave) {
-                            select() // Return the inserted record
+                            select()
                         }
                         .decodeSingle<Task>()
                 } else {
@@ -576,7 +717,7 @@ class SupabaseHelper(private val context: Context) {
                                 eq("id", task.id)
                                 eq("user_id", userId)
                             }
-                            select() // Return the updated record
+                            select()
                         }
                         .decodeSingle<Task>()
                 }
@@ -592,6 +733,15 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Обновляет задачу.
+     * @param taskId ID задачи.
+     * @param isCompleted Флаг завершения задачи (опционально).
+     * @param completedAt Дата завершения (опционально).
+     * @param title Новый заголовок (опционально).
+     * @param description Новое описание (опционально).
+     * @return true, если задача обновлена успешно, иначе false.
+     */
     suspend fun updateTask(
         taskId: Int,
         isCompleted: Boolean? = null,
@@ -600,12 +750,12 @@ class SupabaseHelper(private val context: Context) {
         description: String? = null
     ): Boolean {
         return try {
-            val updates = mutableMapOf<String, Any?>() // Changed to Any? to handle null values
+            val updates = mutableMapOf<String, Any?>()
 
             isCompleted?.let { updates["is_completed"] = it }
             completedAt?.let {
                 if (it.isEmpty()) {
-                    updates["completed_at"] = null // Explicitly set to null to clear the field
+                    updates["completed_at"] = null
                 } else {
                     updates["completed_at"] = it
                 }
@@ -627,11 +777,20 @@ class SupabaseHelper(private val context: Context) {
         }
     }
 
-    // Helper function to get current date in correct format
+    /**
+     * Возвращает текущую дату в формате "yyyy-MM-dd".
+     * @return Строка с датой.
+     */
     private fun getCurrentDate(): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
+    /**
+     * Удаляет задачу.
+     * @param taskId ID задачи.
+     * @return true, если задача удалена успешно.
+     * @throws Exception Если пользователь не аутентифицирован.
+     */
     suspend fun deleteTask(taskId: Int): Boolean {
         return withAuth {
             val userId = client.auth.currentUserOrNull()?.id
@@ -641,13 +800,17 @@ class SupabaseHelper(private val context: Context) {
                 .delete {
                     filter {
                         eq("id", taskId)
-                        eq("user_id", userId) // Ensure we only delete user's own tasks
+                        eq("user_id", userId)
                     }
                 }
             true
         }.getOrThrow()
     }
 
+    /**
+     * Получает типы задач.
+     * @return Список типов задач.
+     */
     suspend fun getTaskTypes(): List<TaskType> {
         return withAuth {
             client.postgrest.from("task_types")
@@ -656,6 +819,10 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    /**
+     * Получает приоритеты задач.
+     * @return Список приоритетов задач.
+     */
     suspend fun getTaskPriorities(): List<TaskPriorityType> {
         return withAuth {
             client.postgrest.from("task_priorite_types")
@@ -665,22 +832,24 @@ class SupabaseHelper(private val context: Context) {
     }
 
 }
-
+/**
+ * Вспомогательный класс для хранения кода дружбы.
+ */
 private data class FriendshipCode(val friendship_code: String)
 
 
-
+/**
+ * Сериализатор для LocalDate.
+ */
 object LocalDateSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("LocalDate", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: String) {
         try {
-            // Validate the date format
             SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(value)
             encoder.encodeString(value)
         } catch (e: Exception) {
-            // Fallback to current date if invalid
             val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             encoder.encodeString(currentDate)
         }
@@ -690,9 +859,25 @@ object LocalDateSerializer : KSerializer<String> {
         return try {
             decoder.decodeString()
         } catch (e: Exception) {
-            // Return empty string if null or invalid
             ""
         }
     }
 }
+
+/**
+ * Сериализатор для LocalDate при вставке профиля.
+ */
+object LocalDateSerializerForInsertProfile : KSerializer<LocalDate> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LocalDate", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: LocalDate) {
+        encoder.encodeString(value.toString())
+    }
+
+    override fun deserialize(decoder: Decoder): LocalDate {
+        return LocalDate.parse(decoder.decodeString())
+    }
+}
+
 

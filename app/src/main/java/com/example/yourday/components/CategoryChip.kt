@@ -20,12 +20,22 @@ import com.example.yourday.ui.theme.Gray1
 import com.example.yourday.ui.theme.Primary
 import com.example.yourday.ui.theme.White
 
+
+
+/**
+ * Компонент "Категории" - стилизованная кнопка для выбора категорий.
+ *
+ * @param text Текст, отображаемый на чипе
+ * @param isSelected Флаг, указывающий выбран ли чип
+ * @param onClick Обработчик нажатия на чип
+ */
 @Composable
 fun CategoryChip(
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+
     Surface(
         modifier = Modifier
             .clickable(onClick = onClick),

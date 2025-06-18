@@ -1,573 +1,537 @@
+// Пакет, содержащий все модели данных приложения
 package com.example.yourday.model
 
+// Импорт необходимых сериализаторов и зависимостей
 import com.example.yourday.api.LocalDateSerializer
+import com.example.yourday.api.LocalDateSerializerForInsertProfile
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-
-@Serializable
-data class Event(
-    val id: String,
-    val title: String,
-    val date: String, // Формат "YYYY-MM-DD"
-    val description: String? = null
-)
-
+// Модель данных профиля пользователя
 @Serializable
 data class ProfileData(
-    @SerialName("user_id") val userId: String,
-    @SerialName("username") val username: String,
-    @Serializable(with = LocalDateSerializer::class)
-    @SerialName("birth_date") val birthDate: LocalDate,
-    @SerialName("gender_id") val genderId: Int? = null,
-    @SerialName("avatar_url") val avatarUrl: String? = null,
-    @SerialName("friendship_code") val friendshipCode: String,
-    @SerialName("registration_date") val registrationDate: String,
-    @SerialName("last_login") val lastLogin: String,
-    @SerialName("is_active") val isActive: Boolean
+    @SerialName("user_id") val userId: String,                     // ID пользователя
+    @SerialName("username") val username: String,                  // Имя пользователя
+    @Serializable(with = LocalDateSerializerForInsertProfile::class)
+    @SerialName("birth_date") val birthDate: LocalDate,            // Дата рождения
+    @SerialName("gender_id") val genderId: Int? = null,            // ID пола (опционально)
+    @SerialName("avatar_url") val avatarUrl: String? = null,       // URL аватара (опционально)
+    @SerialName("friendship_code") val friendshipCode: String,     // Код для добавления в друзья
+    @SerialName("registration_date") val registrationDate: String, // Дата регистрации
+    @SerialName("last_login") val lastLogin: String,               // Последний вход
+    @SerialName("is_active") val isActive: Boolean                 // Активен ли пользователь
 )
 
-data class CalendarEvent(
-    val id: Int,
-    val date: String, // Format: "YYYY-MM-DD"
-    val title: String,
-    val description: String?,
-    val type: String // "daily" or "health"
-)
-
-// Объединенная модель данных для DailyScreen
-data class DailyScreenData(
-    val date: String, // Формат "yyyy-MM-dd"
-    val tasks: List<Task>,
-    val gratitudeJournal: List<GratitudeAndJoyJournal>,
-    val notes: List<DailyNote>,
-    val goals: List<Goal>,
-    val ideas: List<Idea>,
-    val finances: List<Transaction>
-)
-// Update HealthData model to match UI
-@Serializable
-data class HealthData(
-    val steps: List<Steps>,
-    val water: List<WaterIntake>,
-    val nutrition: List<NutritionLog>,
-    val activity: List<UserActivity>,
-    val measurements: List<BodyMeasurement>
-)
-
-
-// Activity Types
+// Модель типа активности
 @Serializable
 data class ActivityType(
-    @SerialName("id") val id: Int,
-    @SerialName("name") val name: String,
-    @SerialName("calories_per_min") val caloriesPerMin: Double? = null,
-    @SerialName("icon_type") val iconType: String? = null
+    @SerialName("id") val id: Int,                     // ID типа активности
+    @SerialName("name") val name: String,              // Название
+    @SerialName("calories_per_min") val caloriesPerMin: Double? = null, // Калории в минуту
+    @SerialName("icon_type") val iconType: String? = null // Тип иконки
 )
 
-// App Icons
+// Модель иконки приложения
 @Serializable
 data class AppIcon(
-    @SerialName("id") val id: Int,
-    @SerialName("name") val name: String,
-    @SerialName("url") val url: String? = null,
-    @SerialName("is_active") val isActive: Boolean = true
+    @SerialName("id") val id: Int,                     // ID иконки
+    @SerialName("name") val name: String,              // Название
+    @SerialName("url") val url: String? = null,        // URL изображения
+    @SerialName("is_active") val isActive: Boolean = true // Активна ли иконка
 )
 
-// Article Categories
+// Модель категории статей
 @Serializable
 data class ArticleCategory(
-    @SerialName("id") val id: Int,
-    @SerialName("category_name") val categoryName: String
+    @SerialName("id") val id: Int,                     // ID категории
+    @SerialName("category_name") val categoryName: String // Название категории
 )
 
-// Article Statuses
+// Модель статуса статьи
 @Serializable
 data class ArticleStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("status_name") val statusName: String
+    @SerialName("id") val id: Int,                     // ID статуса
+    @SerialName("status_name") val statusName: String  // Название статуса
 )
 
-// Articles
+// Модель статьи
 @Serializable
 data class Article(
-    @SerialName("id") val id: Int,
-    @SerialName("title") val title: String,
-    @SerialName("content") val content: String?,
-    @SerialName("article_image") val articleImage: String?,
-    @SerialName("created_at") val createdAt: String
+    @SerialName("id") val id: Int,                     // ID статьи
+    @SerialName("title") val title: String,            // Заголовок
+    @SerialName("content") val content: String?,       // Содержание
+    @SerialName("article_image") val articleImage: String?, // Изображение
+    @SerialName("created_at") val createdAt: String   // Дата создания
 )
 
-// Articles in Categories
+// Модель связи статьи с категорией
 @Serializable
 data class ArticleInCategory(
-    @SerialName("id") val id: Int,
-    @SerialName("article_id") val articleId: Int?,
-    @SerialName("category_id") val categoryId: Int?
+    @SerialName("id") val id: Int,                     // ID связи
+    @SerialName("article_id") val articleId: Int?,     // ID статьи
+    @SerialName("category_id") val categoryId: Int?    // ID категории
 )
 
-// Balance Types
+// Модель типа баланса (доход/расход)
 @Serializable
 data class BalanceType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String     // Название типа
 )
 
-// Body Measurements
+// Модель замеров тела
 @Serializable
 data class BodyMeasurement(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("weight") val weight: Double?,
-    @SerialName("height") val height: Double?,
-    @SerialName("bmi") val bmi: Double?,
-    @SerialName("chest_circum") val chestCircum: Double?,
-    @SerialName("waist_circum") val waistCircum: Double?,
-    @SerialName("hip_circum") val hipCircum: Double?
+    @SerialName("id") val id: Int,                     // ID замера
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата замера
+    @SerialName("weight") val weight: Double?,         // Вес
+    @SerialName("height") val height: Double?,         // Рост
+    @SerialName("bmi") val bmi: Double?,               // ИМТ
+    @SerialName("chest_circum") val chestCircum: Double?, // Обхват груди
+    @SerialName("waist_circum") val waistCircum: Double?, // Обхват талии
+    @SerialName("hip_circum") val hipCircum: Double?   // Обхват бедер
 )
 
-// Checklist Categories
+// Модель категории чеклиста
 @Serializable
 data class ChecklistCategory(
-    @SerialName("id") val id: Int,
-    @SerialName("category_name") val categoryName: String,
-    @SerialName("icon") val icon: String? = null
+    @SerialName("id") val id: Int,                     // ID категории
+    @SerialName("category_name") val categoryName: String, // Название
+    @SerialName("icon") val icon: String? = null       // Иконка
 )
 
-// Checklist Items
+// Модель элемента чеклиста
 @Serializable
 data class ChecklistItem(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("category_id") val categoryId: Int?,
-    @SerialName("item_name") val itemName: String
+    @SerialName("id") val id: Int,                     // ID элемента
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("category_id") val categoryId: Int?,   // ID категории
+    @SerialName("item_name") val itemName: String      // Название элемента
 )
 
-// Daily Notes
+// Модель ежедневной заметки
 @Serializable
 data class DailyNote(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("note") val note: String?
+    @SerialName("id") val id: Int,                     // ID заметки
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата заметки
+    @SerialName("note") val note: String?              // Текст заметки
 )
 
-// Daily Photos
+// Модель ежедневного фото
 @Serializable
 data class DailyPhoto(
-    @SerialName("id") val id: Int,
-    @SerialName("photo_url") val photoUrl: String,
-    @SerialName("date") val date: String
+    @SerialName("id") val id: Int,                     // ID фото
+    @SerialName("photo_url") val photoUrl: String,      // URL фото
+    @SerialName("date") val date: String               // Дата фото
 )
 
-// Daily Quotes
+// Модель ежедневной цитаты
 @Serializable
 data class DailyQuote(
-    @SerialName("id") val id: Int,
-    @SerialName("quote") val quote: String,
-    @SerialName("date") val date: String,
-    @SerialName("author_quote") val authorQuote: String = "Нет автора"
+    @SerialName("id") val id: Int,                     // ID цитаты
+    @SerialName("quote") val quote: String,            // Текст цитаты
+    @SerialName("date") val date: String,              // Дата цитаты
+    @SerialName("author_quote") val authorQuote: String = "Нет автора" // Автор
 )
 
-// Days of the Week
+// Модель дня недели
 @Serializable
 data class DayOfTheWeek(
-    @SerialName("id") val id: Int,
-    @SerialName("day_weekly_name") val dayWeeklyName: String
+    @SerialName("id") val id: Int,                     // ID дня
+    @SerialName("day_weekly_name") val dayWeeklyName: String // Название дня
 )
 
-// Deleted Records
+// Модель удаленной записи
 @Serializable
 data class DeletedRecord(
-    @SerialName("id") val id: Int,
-    @SerialName("original_id") val originalId: Int,
-    @SerialName("table_name") val tableName: String,
-    @SerialName("deleted_data") val deletedData: String?,
-    @SerialName("deleted_at") val deletedAt: String
+    @SerialName("id") val id: Int,                     // ID удаления
+    @SerialName("original_id") val originalId: Int,    // ID оригинальной записи
+    @SerialName("table_name") val tableName: String,   // Имя таблицы
+    @SerialName("deleted_data") val deletedData: String?, // Данные удаленной записи
+    @SerialName("deleted_at") val deletedAt: String   // Время удаления
 )
 
-// Food Items
+// Модель продукта питания
 @Serializable
 data class FoodItem(
-    @SerialName("id") val id: Int,
-    @SerialName("name") val name: String,
-    @SerialName("unit_id") val unitId: Int?,
-    @SerialName("calories_per_unit") val caloriesPerUnit: Double?,
-    @SerialName("protein_per_unit") val proteinPerUnit: Double?,
-    @SerialName("fat_per_unit") val fatPerUnit: Double?,
-    @SerialName("carbs_per_unit") val carbsPerUnit: Double?
+    @SerialName("id") val id: Int,                     // ID продукта
+    @SerialName("name") val name: String,              // Название
+    @SerialName("unit_id") val unitId: Int?,           // ID единицы измерения
+    @SerialName("calories_per_unit") val caloriesPerUnit: Double?, // Калории на единицу
+    @SerialName("protein_per_unit") val proteinPerUnit: Double?, // Белки
+    @SerialName("fat_per_unit") val fatPerUnit: Double?,       // Жиры
+    @SerialName("carbs_per_unit") val carbsPerUnit: Double?    // Углеводы
 )
 
-// Friends
+// Модель друга
 @Serializable
 data class Friend(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("friend_id") val friendId: String,
-    @SerialName("status_id") val statusId: Int?,
-    @SerialName("created_at") val createdAt: String
+    @SerialName("id") val id: Int,                     // ID связи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("friend_id") val friendId: String,     // ID друга
+    @SerialName("status_id") val statusId: Int?,       // ID статуса дружбы
+    @SerialName("created_at") val createdAt: String   // Дата создания связи
 )
 
-// Friendship Statuses
+// Модель статуса дружбы
 @Serializable
 data class FriendshipStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("status_name") val statusName: String
+    @SerialName("id") val id: Int,                     // ID статуса
+    @SerialName("status_name") val statusName: String  // Название статуса
 )
 
-// Genders
+// Модель пола
 @Serializable
 data class Gender(
-    @SerialName("id") val id: Int,
-    @SerialName("gender_name") val genderName: String
+    @SerialName("id") val id: Int,                     // ID пола
+    @SerialName("gender_name") val genderName: String  // Название пола
 )
 
-// Goal and Habit Types
+// Модель типа цели/привычки
 @Serializable
 data class GoalAndHabitType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String,
-    @SerialName("icon_type") val iconType: String? = null
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String,     // Название типа
+    @SerialName("icon_type") val iconType: String? = null // Иконка типа
 )
 
-// Goal Statuses
+// Модель статуса цели
 @Serializable
 data class GoalStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("status_name") val statusName: String
+    @SerialName("id") val id: Int,                     // ID статуса
+    @SerialName("status_name") val statusName: String  // Название статуса
 )
 
-// Goals
+// Модель цели
 @Serializable
 data class Goal(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("title") val title: String,
-    @SerialName("description") val description: String?,
-    @SerialName("goal_type_id") val goalTypeId: Int?,
-    @SerialName("status_id") val statusId: Int?,
-    @SerialName("progress_goal") val progressGoal: Double = 0.0,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("achieved_at") val achievedAt: String?,
-    @SerialName("last_updated") val lastUpdated: String
+    @SerialName("id") val id: Int,                     // ID цели
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("title") val title: String,            // Название цели
+    @SerialName("description") val description: String?, // Описание
+    @SerialName("goal_type_id") val goalTypeId: Int?,   // ID типа цели
+    @SerialName("status_id") val statusId: Int?,       // ID статуса
+    @SerialName("progress_goal") val progressGoal: Double = 0.0, // Прогресс
+    @SerialName("created_at") val createdAt: String,  // Дата создания
+    @SerialName("achieved_at") val achievedAt: String?, // Дата достижения
+    @SerialName("last_updated") val lastUpdated: String // Последнее обновление
 )
 
-// Gratitude and Joy Journals
+// Модель записи дневника благодарности
 @Serializable
 data class GratitudeAndJoyJournal(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("gratitude") val gratitude: String?,
-    @SerialName("joy") val joy: String?
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата записи
+    @SerialName("gratitude") val gratitude: String?,   // За что благодарен
+    @SerialName("joy") val joy: String?                // Что порадовало
 )
 
-// Habits
+// Модель привычки
 @Serializable
 data class Habit(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("title") val title: String,
-    @SerialName("habit_type_id") val habitTypeId: Int?,
-    @SerialName("created_at") val createdAt: String
+    @SerialName("id") val id: Int,                     // ID привычки
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("title") val title: String,            // Название привычки
+    @SerialName("habit_type_id") val habitTypeId: Int?, // ID типа привычки
+    @SerialName("created_at") val createdAt: String   // Дата создания
 )
 
-// Hobbies
+// Модель хобби
 @Serializable
 data class Hobby(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("name") val name: String,
-    @SerialName("description") val description: String?,
-    @SerialName("day1_id") val day1Id: Int?,
-    @SerialName("day2_id") val day2Id: Int?,
-    @SerialName("day3_id") val day3Id: Int?
+    @SerialName("id") val id: Int,                     // ID хобби
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("name") val name: String,              // Название хобби
+    @SerialName("description") val description: String?, // Описание
+    @SerialName("day1_id") val day1Id: Int?,          // День 1 для занятия
+    @SerialName("day2_id") val day2Id: Int?,          // День 2
+    @SerialName("day3_id") val day3Id: Int?           // День 3
 )
 
-// Ideas
+// Модель идеи
 @Serializable
 data class Idea(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("title") val title: String,
-    @SerialName("description") val description: String?
+    @SerialName("id") val id: Int,                     // ID идеи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата идеи
+    @SerialName("title") val title: String,            // Заголовок
+    @SerialName("description") val description: String? // Описание
 )
 
-// Item Marks
+// Модель отметки выполнения элемента
 @Serializable
 data class ItemMark(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("item_id") val itemId: Int,
-    @SerialName("date") val date: String,
-    @SerialName("time") val time: String?,
-    @SerialName("is_taken") val isTaken: Boolean = false
+    @SerialName("id") val id: Int,                     // ID отметки
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("item_id") val itemId: Int,            // ID элемента
+    @SerialName("date") val date: String,              // Дата отметки
+    @SerialName("time") val time: String?,             // Время отметки
+    @SerialName("is_taken") val isTaken: Boolean = false // Выполнено ли
 )
 
-// Meal Types
+// Модель типа приема пищи
 @Serializable
 data class MealType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String      // Название типа
 )
 
-// Medications
+// Модель лекарства
 @Serializable
 data class Medication(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("name") val name: String,
-    @SerialName("unit_id") val unitId: Int?,
-    @SerialName("description") val description: String?,
-    @SerialName("dosage") val dosage: String?,
-    @SerialName("amount_medicine") val amountMedicine: Double?,
-    @SerialName("acceptance_time") val acceptanceTime: String?,
-    @SerialName("interval") val interval: String?
+    @SerialName("id") val id: Int,                     // ID лекарства
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("name") val name: String,              // Название
+    @SerialName("unit_id") val unitId: Int?,           // ID единицы измерения
+    @SerialName("description") val description: String?, // Описание
+    @SerialName("dosage") val dosage: String?,         // Дозировка
+    @SerialName("amount_medicine") val amountMedicine: Double?, // Количество
+    @SerialName("acceptance_time") val acceptanceTime: String?, // Время приема
+    @SerialName("interval") val interval: String?      // Интервал приема
 )
 
-// Mood Motivational Cards
+// Модель мотивационной карточки настроения
 @Serializable
 data class MoodMotivationalCard(
-    @SerialName("id") val id: Int,
-    @SerialName("card_id") val cardId: Int?,
-    @SerialName("mood_type_id") val moodTypeId: Int?
+    @SerialName("id") val id: Int,                     // ID связи
+    @SerialName("card_id") val cardId: Int?,           // ID карточки
+    @SerialName("mood_type_id") val moodTypeId: Int?    // ID типа настроения
 )
 
-// Mood Types
+// Модель типа настроения
 @Serializable
 data class MoodType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String,
-    @SerialName("icon_type") val iconType: String? = null
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String,     // Название типа
+    @SerialName("icon_type") val iconType: String? = null // Иконка типа
 )
 
-// Motivational Cards
+// Модель мотивационной карточки
 @Serializable
 data class MotivationalCard(
-    @SerialName("id") val id: Int,
-    @SerialName("quote_id") val quoteId: Int?,
-    @SerialName("photo_id") val photoId: Int?
+    @SerialName("id") val id: Int,                     // ID карточки
+    @SerialName("quote_id") val quoteId: Int?,         // ID цитаты
+    @SerialName("photo_id") val photoId: Int?          // ID фото
 )
 
-// Motivational User Cards
+// Модель пользовательской мотивационной карточки
 @Serializable
 data class MotivationalUserCard(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("card_id") val cardId: Int,
-    @SerialName("date") val date: String
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("card_id") val cardId: Int,            // ID карточки
+    @SerialName("date") val date: String              // Дата показа
 )
 
-// Notification Types
+// Модель типа уведомления
 @Serializable
 data class NotificationType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String      // Название типа
 )
 
-// Notifications
+// Модель уведомления
 @Serializable
 data class Notification(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("initiator_id") val initiatorId: String?,
-    @SerialName("type_id") val typeId: Int?,
-    @SerialName("message") val message: String?,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("is_read") val isRead: Boolean = false,
-    @SerialName("additional_data") val additionalData: String?
+    @SerialName("id") val id: Int,                     // ID уведомления
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("initiator_id") val initiatorId: String?, // ID инициатора
+    @SerialName("type_id") val typeId: Int?,           // ID типа
+    @SerialName("message") val message: String?,       // Сообщение
+    @SerialName("created_at") val createdAt: String,   // Дата создания
+    @SerialName("is_read") val isRead: Boolean = false, // Прочитано ли
+    @SerialName("additional_data") val additionalData: String? // Доп. данные
 )
 
-// Nutrition Log
+// Модель записи о питании
 @Serializable
 data class NutritionLog(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("food_id") val foodId: Int?,
-    @SerialName("meal_type_id") val mealTypeId: Int?,
-    @SerialName("quantity") val quantity: Double,
-    @SerialName("date") val date: String
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("food_id") val foodId: Int?,           // ID продукта
+    @SerialName("meal_type_id") val mealTypeId: Int?,   // ID типа приема пищи
+    @SerialName("quantity") val quantity: Double,      // Количество
+    @SerialName("date") val date: String              // Дата записи
 )
 
-// Steps
+// Модель записи о шагах
 @Serializable
 data class Steps(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("steps_count") val stepsCount: Int,
-    @SerialName("date") val date: String
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("steps_count") val stepsCount: Int,    // Количество шагов
+    @SerialName("date") val date: String              // Дата записи
 )
 
-// Support Tickets
+// Модель заявки в поддержку
 @Serializable
 data class SupportTicket(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String?,
-    @SerialName("email") val email: String,
-    @SerialName("subject") val subject: String,
-    @SerialName("description") val description: String?,
-    @SerialName("id_status") val idStatus: Int?,
-    @SerialName("id_priority") val idPriority: Int?,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("updated_at") val updatedAt: String
+    @SerialName("id") val id: Int,                     // ID заявки
+    @SerialName("user_id") val userId: String?,        // ID пользователя
+    @SerialName("email") val email: String,            // Email отправителя
+    @SerialName("subject") val subject: String,        // Тема
+    @SerialName("description") val description: String?, // Описание
+    @SerialName("id_status") val idStatus: Int?,       // ID статуса
+    @SerialName("id_priority") val idPriority: Int?,   // ID приоритета
+    @SerialName("created_at") val createdAt: String,   // Дата создания
+    @SerialName("updated_at") val updatedAt: String    // Дата обновления
 )
 
-// Task Dependencies
+// Модель зависимости задач
 @Serializable
 data class TaskDependency(
-    @SerialName("id") val id: Int,
-    @SerialName("task_id") val taskId: Int?,
-    @SerialName("depends_on") val dependsOn: Int?,
-    @SerialName("order_by") val orderBy: Int?
+    @SerialName("id") val id: Int,                     // ID зависимости
+    @SerialName("task_id") val taskId: Int?,           // ID задачи
+    @SerialName("depends_on") val dependsOn: Int?,     // ID задачи, от которой зависит
+    @SerialName("order_by") val orderBy: Int?          // Порядок выполнения
 )
 
-// Task Priority Types
+// Модель типа приоритета задачи
 @Serializable
 data class TaskPriorityType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String
+    @SerialName("id") val id: Int,                     // ID приоритета
+    @SerialName("type_name") val typeName: String      // Название типа
 )
 
-// Task Types
+// Модель типа задачи
 @Serializable
 data class TaskType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String,
-    @SerialName("type_icon") val typeIcon: String? = null
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String,     // Название типа
+    @SerialName("type_icon") val typeIcon: String? = null // Иконка типа
 )
 
+// Модель задачи
 @Serializable
 data class Task(
-    @SerialName("id") val id: Int = 0,
-    @SerialName("user_id") val userId: String,
-    @SerialName("title") val title: String,
-    @SerialName("description") val description: String,
-    @SerialName("task_type_id") val taskTypeId: Int?,
-    @SerialName("priority_id") val priorityId: Int?,
+    @SerialName("id") val id: Int = 0,                 // ID задачи (0 для новой)
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("title") val title: String,            // Заголовок
+    @SerialName("description") val description: String, // Описание
+    @SerialName("task_type_id") val taskTypeId: Int?,   // ID типа задачи
+    @SerialName("priority_id") val priorityId: Int?,    // ID приоритета
     @SerialName("created_at")
     @Serializable(with = LocalDateSerializer::class)
-    val createdAt: String,
+    val createdAt: String,                             // Дата создания
     @SerialName("due_date")
     @Serializable(with = LocalDateSerializer::class)
-    val dueDate: String,
+    val dueDate: String,                               // Срок выполнения
     @SerialName("is_dependent")
-    val isDependent: Boolean = false,
+    val isDependent: Boolean = false,                  // Зависит ли от других
     @SerialName("is_completed")
-    val isCompleted: Boolean = false,
+    val isCompleted: Boolean = false,                  // Выполнена ли
     @SerialName("completed_at")
     @Serializable(with = LocalDateSerializer::class)
-    val completedAt: String = ""  // Default empty string handles null values
+    val completedAt: String = ""                       // Дата выполнения
 )
 
-// Themes
+// Модель темы приложения
 @Serializable
 data class Theme(
-    @SerialName("id") val id: Int,
-    @SerialName("theme_name") val themeName: String,
-    @SerialName("is_default") val isDefault: Boolean = false
+    @SerialName("id") val id: Int,                     // ID темы
+    @SerialName("theme_name") val themeName: String,   // Название темы
+    @SerialName("is_default") val isDefault: Boolean = false // Тема по умолчанию
 )
 
-// Ticket Priorities
+// Модель приоритета заявки
 @Serializable
 data class TicketPriority(
-    @SerialName("id") val id: Int,
-    @SerialName("priority_name") val priorityName: String
+    @SerialName("id") val id: Int,                     // ID приоритета
+    @SerialName("priority_name") val priorityName: String // Название
 )
 
-// Ticket Statuses
+// Модель статуса заявки
 @Serializable
 data class TicketStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("status_name") val statusName: String
+    @SerialName("id") val id: Int,                     // ID статуса
+    @SerialName("status_name") val statusName: String  // Название статуса
 )
 
-// Transactions
+// Модель финансовой операции
 @Serializable
 data class Transaction(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("title") val title: String,
-    @SerialName("description") val description: String?,
-    @SerialName("balance_type_id") val balanceTypeId: Int?,
-    @SerialName("amount") val amount: Double,
-    @SerialName("date") val date: String
+    @SerialName("id") val id: Int,                     // ID операции
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("title") val title: String,            // Название
+    @SerialName("description") val description: String?, // Описание
+    @SerialName("balance_type_id") val balanceTypeId: Int?, // ID типа операции
+    @SerialName("amount") val amount: Double,         // Сумма
+    @SerialName("date") val date: String              // Дата операции
 )
 
-// Units
+// Модель единицы измерения
 @Serializable
 data class Unit(
-    @SerialName("id") val id: Int,
-    @SerialName("unit_name") val unitName: String
+    @SerialName("id") val id: Int,                     // ID единицы
+    @SerialName("unit_name") val unitName: String      // Название единицы
 )
 
-// User Activity
+// Модель активности пользователя
 @Serializable
 data class UserActivity(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("activity_type_id") val activityTypeId: Int?,
-    @SerialName("duration_minutes") val durationMinutes: Int
+    @SerialName("id") val id: Int,                     // ID активности
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата активности
+    @SerialName("activity_type_id") val activityTypeId: Int?, // ID типа
+    @SerialName("duration_minutes") val durationMinutes: Int // Длительность (мин)
 )
 
-// User Article Statuses
+// Модель статуса статьи для пользователя
 @Serializable
 data class UserArticleStatus(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("article_id") val articleId: Int?,
-    @SerialName("status_id") val statusId: Int?,
-    @SerialName("status_changed_at") val statusChangedAt: String
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("article_id") val articleId: Int?,      // ID статьи
+    @SerialName("status_id") val statusId: Int?,        // ID статуса
+    @SerialName("status_changed_at") val statusChangedAt: String // Дата изменения
 )
 
-// User Moods
+// Модель настроения пользователя
 @Serializable
 data class UserMood(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("mood_type_id") val moodTypeId: Int?,
-    @SerialName("is_shared") val isShared: Boolean = false
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата
+    @SerialName("mood_type_id") val moodTypeId: Int?,   // ID типа настроения
+    @SerialName("is_shared") val isShared: Boolean = false // Поделился ли
 )
 
-// User Settings
+// Модель настроек пользователя
 @Serializable
 data class UserSetting(
-    @SerialName("user_id") val userId: String,
-    @SerialName("id_theme") val idTheme: Int?,
-    @SerialName("id_icon") val idIcon: Int?,
-    @SerialName("created_at") val createdAt: String
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("id_theme") val idTheme: Int?,         // ID темы
+    @SerialName("id_icon") val idIcon: Int?,           // ID иконки
+    @SerialName("created_at") val createdAt: String    // Дата создания
 )
 
-// User Wellbeing
+// Модель самочувствия пользователя
 @Serializable
 data class UserWellbeing(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("wellbeing_type_id") val wellbeingTypeId: Int?
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата
+    @SerialName("wellbeing_type_id") val wellbeingTypeId: Int? // ID типа
 )
 
-// Water Intake
+// Модель потребления воды
 @Serializable
 data class WaterIntake(
-    @SerialName("id") val id: Int,
-    @SerialName("user_id") val userId: String,
-    @SerialName("date") val date: String,
-    @SerialName("time") val time: String?,
-    @SerialName("amount_ml") val amountMl: Double
+    @SerialName("id") val id: Int,                     // ID записи
+    @SerialName("user_id") val userId: String,         // ID пользователя
+    @SerialName("date") val date: String,              // Дата
+    @SerialName("time") val time: String?,             // Время
+    @SerialName("amount_ml") val amountMl: Double      // Количество в мл
 )
 
-// Wellbeing Types
+// Модель типа самочувствия
 @Serializable
 data class WellbeingType(
-    @SerialName("id") val id: Int,
-    @SerialName("type_name") val typeName: String,
-    @SerialName("icon_type") val iconType: String? = null
+    @SerialName("id") val id: Int,                     // ID типа
+    @SerialName("type_name") val typeName: String,     // Название типа
+    @SerialName("icon_type") val iconType: String? = null // Иконка типа
 )
-
-
-

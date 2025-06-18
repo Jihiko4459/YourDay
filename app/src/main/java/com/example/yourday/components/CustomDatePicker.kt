@@ -34,6 +34,13 @@ import com.example.yourday.ui.theme.Purple1
 import java.time.Instant
 import java.util.Calendar
 
+
+/**
+ * Кастомный компонент выбора даты с диалоговым окном.
+ *
+ * @param onDateSelected Колбэк, вызываемый при выборе даты (передает timestamp в миллисекундах)
+ * @param modifier Модификатор для настройки внешнего вида компонента
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomDatePicker(

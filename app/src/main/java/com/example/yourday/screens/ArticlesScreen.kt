@@ -46,9 +46,6 @@ import com.example.yourday.components.ToastDuration
 import com.example.yourday.components.ToastManager
 import com.example.yourday.components.ToastType
 import com.example.yourday.data.ArticleData
-import com.example.yourday.data.MockArticleInCategoryRepository
-import com.example.yourday.data.MockArticleRepository
-import com.example.yourday.data.MockCategoryRepository
 import com.example.yourday.model.Article
 import com.example.yourday.model.ArticleCategory
 import com.example.yourday.ui.theme.DarkBlue
@@ -68,40 +65,23 @@ fun ArticlesScreen(
     var isLoading by remember { mutableStateOf(true) }
     var isError by remember { mutableStateOf(false) }
 
-    // Fetch data from Supabase or use mock data
     LaunchedEffect(Unit) {
         val success = ArticleData.loadData(supabaseHelper)
-        isError = !success
-        if (isError) {
+        if (!success) {
             ToastManager.show(
                 message = "Загрузка данных временно недоступна. Используются локальные данные",
                 type = ToastType.INFO,
                 duration = ToastDuration.LONG
             )
-            // Immediately load mock data when error occurs
-            ArticleData.articles = MockArticleRepository.getAllArticles()
-            ArticleData.categories = MockCategoryRepository.getAllCategories()
-            ArticleData.articleInCategories = MockArticleInCategoryRepository.getAllRelations()
         }
         isLoading = false
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
-        when {
-            isLoading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }isError || ArticleData.articles.isEmpty() -> {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("Используются локальные данные")
-                // No retry button needed since we're using mock data
-            }
-
-            // Show content with mock data
-            Column(modifier = Modifier.fillMaxSize()) {
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        } else {
+            Column {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -132,7 +112,6 @@ fun ArticlesScreen(
                         isSelected = selectedCategory == null,
                         onClick = { selectedCategory = null }
                     )
-
                     ArticleData.categories.forEach { category ->
                         CategoryChip(
                             text = category.categoryName,
@@ -149,61 +128,6 @@ fun ArticlesScreen(
                             categories = ArticleData.getCategoriesForArticle(article.id),
                             onClick = { onIntentToDetails(article.id) }
                         )
-                    }
-                }
-            }
-        }
-            else -> {
-                // Normal content when data loaded successfully
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp, bottom = 22.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Статьи",
-                            modifier = Modifier.fillMaxWidth(),
-                            style = TextStyle(
-                                fontSize = 24.sp,
-                                fontFamily = FontFamily(Font(R.font.roboto_semibold)),
-                                color = Primary
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(vertical = 22.dp),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        CategoryChip(
-                            text = "Все категории",
-                            isSelected = selectedCategory == null,
-                            onClick = { selectedCategory = null }
-                        )
-
-                        ArticleData.categories.forEach { category ->
-                            CategoryChip(
-                                text = category.categoryName,
-                                isSelected = selectedCategory?.id == category.id,
-                                onClick = { selectedCategory = category }
-                            )
-                        }
-                    }
-
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(ArticleData.getArticlesByCategory(selectedCategory?.id)) { article ->
-                            ArticleCard(
-                                article = article,
-                                categories = ArticleData.getCategoriesForArticle(article.id),
-                                onClick = { onIntentToDetails(article.id) }
-                            )
-                        }
                     }
                 }
             }

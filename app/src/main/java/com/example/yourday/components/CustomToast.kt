@@ -40,15 +40,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+
+// Типы тостов (уведомлений)
 enum class ToastType {
     SUCCESS, ERROR, INFO
 }
 
+// Длительность показа тоста
 enum class ToastDuration(val timeMillis: Long) {
     SHORT(2000L),
     LONG(3500L)
 }
 
+
+/**
+ * Кастомный компонент Toast (уведомления)
+ *
+ * @param message Текст сообщения
+ * @param type Тип тоста (SUCCESS, ERROR, INFO)
+ * @param duration Длительность показа
+ * @param modifier Модификатор для настройки внешнего вида
+ */
 @Composable
 fun CustomToast(
     message: String,
@@ -98,6 +110,10 @@ fun CustomToast(
     }
 }
 
+
+/**
+ * Глобальный Toast, который можно вызывать из любого места приложения
+ */
 @Composable
 fun GlobalToast() {
     AnimatedVisibility(
@@ -124,6 +140,9 @@ fun GlobalToast() {
     }
 }
 
+/**
+ * Объект для управления Toast-уведомлениями во всем приложении
+ */
 object ToastManager {
     var showToast by mutableStateOf(false)
     var toastMessage by mutableStateOf("")

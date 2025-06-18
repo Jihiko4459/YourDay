@@ -1,4 +1,3 @@
-// ArticleData.kt
 package com.example.yourday.data
 
 import androidx.compose.runtime.getValue
@@ -9,12 +8,25 @@ import com.example.yourday.model.Article
 import com.example.yourday.model.ArticleCategory
 import com.example.yourday.model.ArticleInCategory
 
+
+/**
+ * Объект для хранения и управления данными статей.
+ * Использует Compose State для реактивного обновления UI при изменении данных.
+ */
 object ArticleData {
+    // Список всех статей с возможностью наблюдения за изменениями
     var articles: List<Article> by mutableStateOf(emptyList())
+    // Список всех категорий статей с возможностью наблюдения за изменениями
     var categories: List<ArticleCategory> by mutableStateOf(emptyList())
+    // Связи между статьями и категориями с возможностью наблюдения за изменениями
     var articleInCategories: List<ArticleInCategory> by mutableStateOf(emptyList())
 
-    // Get articles filtered by category
+    /**
+     * Получает статьи, отфильтрованные по категории.
+     *
+     * @param categoryId ID категории для фильтрации (null - все статьи)
+     * @return Список статей в указанной категории или все статьи, если categoryId = null
+     */
     fun getArticlesByCategory(categoryId: Int?): List<Article> {
         return if (categoryId == null) {
             articles
@@ -26,7 +38,12 @@ object ArticleData {
         }
     }
 
-    // Get categories for specific article
+    /**
+     * Получает категории для конкретной статьи.
+     *
+     * @param articleId ID статьи
+     * @return Список категорий, к которым принадлежит статья
+     */
     fun getCategoriesForArticle(articleId: Int): List<ArticleCategory> {
         return articleInCategories
             .filter { it.articleId == articleId }
@@ -35,16 +52,28 @@ object ArticleData {
             }
     }
 
-    // Load data with Supabase fallback to mocks
+
+    /**
+     * Загружает данные статей из Supabase или использует мок-данные в случае ошибки.
+     *
+     * @param supabaseHelper Клиент для работы с Supabase
+     * @return true, если данные успешно загружены из Supabase, false - если использованы моки
+     */
     suspend fun loadData(supabaseHelper: SupabaseHelper): Boolean {
         return try {
-            articles = supabaseHelper.getArticles().ifEmpty { MockArticleRepository.getAllArticles() }
-            categories = supabaseHelper.getArticleCategories().ifEmpty { MockCategoryRepository.getAllCategories() }
-            articleInCategories = supabaseHelper.getArticleInCategories().ifEmpty {
-                MockArticleInCategoryRepository.getAllRelations()
-            }
+            // Пытаемся загрузить данные из Supabase
+            val supabaseArticles = supabaseHelper.getArticles()
+            val supabaseCategories = supabaseHelper.getArticleCategories()
+            val supabaseRelations = supabaseHelper.getArticleInCategories()
+
+            // Обновляем состояние независимо от того, пустые данные или нет
+            articles = supabaseArticles.ifEmpty { MockArticleRepository.getAllArticles() }
+            categories = supabaseCategories.ifEmpty { MockCategoryRepository.getAllCategories() }
+            articleInCategories = supabaseRelations.ifEmpty { MockArticleInCategoryRepository.getAllRelations() }
+
             true
         } catch (e: Exception) {
+            // В случае ошибки используем мок-данные
             articles = MockArticleRepository.getAllArticles()
             categories = MockCategoryRepository.getAllCategories()
             articleInCategories = MockArticleInCategoryRepository.getAllRelations()

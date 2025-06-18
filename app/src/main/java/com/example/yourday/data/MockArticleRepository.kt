@@ -3,6 +3,11 @@ package com.example.yourday.data
 
 import com.example.yourday.model.Article
 
+/**
+ * Объект-репозиторий для работы с мок-данными статей.
+ * Содержит предзаполненные данные статей для тестирования и демонстрации,
+ * когда реальные данные из API недоступны.
+ */
 object MockArticleRepository {
     private val mockArticles = listOf(
         Article(
@@ -1088,11 +1093,20 @@ object MockArticleRepository {
             createdAt = "2025-06-05 18:32:53.637792+00"
         )
     )
-
+    /**
+     * Получает статью по её идентификатору.
+     *
+     * @param id Уникальный идентификатор статьи
+     * @return Статья с указанным ID или null, если статья не найдена
+     */
     fun getArticleById(id: Int): Article? {
         return mockArticles.firstOrNull { it.id == id }
     }
-
+    /**
+     * Получает все доступные статьи.
+     *
+     * @return Список всех статей
+     */
     fun getAllArticles(): List<Article> {
         return mockArticles
     }

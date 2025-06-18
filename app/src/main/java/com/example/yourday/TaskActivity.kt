@@ -66,7 +66,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.yourday.api.SupabaseHelper
-import com.example.yourday.data.TaskMetadataRepository
 import com.example.yourday.data.TaskRepository
 import com.example.yourday.model.Task
 import com.example.yourday.model.TaskPriorityType
@@ -77,6 +76,7 @@ import com.example.yourday.ui.theme.White
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -127,11 +127,10 @@ class TaskActivity : ComponentActivity() {
                     composable("taskDetail/{taskId}") { backStackEntry ->
                         val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull()
                         TaskDetailScreen(
-                            taskId = intent.getIntExtra("taskId", 0).takeIf { it != 0 },
+                            taskId = taskId,
                             supabaseHelper = supabaseHelper,
                             onBack = { finish() },
                             onTaskSaved = {
-                                // Устанавливаем результат, который будет обработан в MainActivity
                                 setResult(RESULT_OK)
                                 finish()
                             }
@@ -193,36 +192,36 @@ fun TaskDetailScreen(
     var taskTypes by remember { mutableStateOf<List<TaskType>>(emptyList()) }
     var priorities by remember { mutableStateOf<List<TaskPriorityType>>(emptyList()) }
 
-    // Load task types and priorities
-    LaunchedEffect(Unit) {
+    LaunchedEffect(taskId) {
         isLoading = true
         try {
-            taskTypes = TaskMetadataRepository.getTaskTypes(supabaseHelper)
-            priorities = TaskMetadataRepository.getTaskPriorities(supabaseHelper)
-        } catch (e: Exception) {
-            error = "Не удалось загрузить типы задач. Используются локальные данные."
-            taskTypes = TaskMetadataRepository.mockTaskTypes
-            priorities = TaskMetadataRepository.mockPriorities
-        } finally {
-            isLoading = false
-        }
-    }
+            // Параллельно загружаем типы задач и приоритеты
+            val typesDeferred = async { TaskRepository.getTaskTypes(supabaseHelper) }
+            val prioritiesDeferred = async { TaskRepository.getTaskPriorities(supabaseHelper) }
 
-    // Load task data when taskId changes
-    LaunchedEffect(taskId) {
-        if (taskId != null && !isEditing) {
-            isLoading = true
-            task = TaskRepository.getTaskById(taskId, userId, supabaseHelper)
-            // Update fields with loaded task data
-            title = task?.title ?: ""
-            description = task?.description ?: ""
-            task?.taskTypeId?.let { typeId ->
-                selectedTaskType = taskTypes.find { it.id == typeId }
+            taskTypes = typesDeferred.await()
+            priorities = prioritiesDeferred.await()
+
+            // Для новой задачи устанавливаем первые значения по умолчанию
+            if (taskId == null) {
+                selectedTaskType = taskTypes.firstOrNull()
+                selectedPriority = priorities.firstOrNull()
+            } else {
+                // Загружаем задачу только после загрузки типов и приоритетов
+                task = TaskRepository.getTaskById(taskId, userId, supabaseHelper)
+                task?.let {
+                    title = it.title ?: ""
+                    description = it.description ?: ""
+                    internalDueDate = it.dueDate ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+                    // Устанавливаем выбранные тип и приоритет
+                    selectedTaskType = taskTypes.find { type -> type.id == it.taskTypeId }
+                    selectedPriority = priorities.find { priority -> priority.id == it.priorityId }
+                }
             }
-            task?.priorityId?.let { priorityId ->
-                selectedPriority = priorities.find { it.id == priorityId }
-            }
-            internalDueDate = task?.dueDate ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        } catch (e: Exception) {
+            error = "Ошибка при загрузке данных: ${e.message}"
+        } finally {
             isLoading = false
         }
     }
