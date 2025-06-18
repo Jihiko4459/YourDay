@@ -6,21 +6,14 @@ import co.touchlab.kermit.Logger
 import com.example.yourday.model.Article
 import com.example.yourday.model.ArticleCategory
 import com.example.yourday.model.ArticleInCategory
-import com.example.yourday.model.BodyMeasurement
-import com.example.yourday.model.DailyNote
 import com.example.yourday.model.Goal
-import com.example.yourday.model.GratitudeAndJoyJournal
 import com.example.yourday.model.Idea
-import com.example.yourday.model.MotivationalCard
-import com.example.yourday.model.NutritionLog
 import com.example.yourday.model.ProfileData
 import com.example.yourday.model.Steps
 import com.example.yourday.model.Task
 import com.example.yourday.model.TaskPriorityType
 import com.example.yourday.model.TaskType
-import com.example.yourday.model.Transaction
 import com.example.yourday.model.UserActivity
-import com.example.yourday.model.WaterIntake
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.BadRequestRestException
@@ -33,7 +26,6 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.delay
@@ -387,32 +379,6 @@ class SupabaseHelper(private val context: Context) {
 
 
 
-    internal suspend fun getDailyNotes(date: String, userId: String): List<DailyNote> {
-        return withAuth {
-            client.postgrest.from("daily_notes")
-                .select {
-                    filter {
-                        eq("date", date)
-                        eq("user_id", userId)
-                    }
-                }.decodeList<DailyNote>()
-        }.getOrElse { emptyList() }
-    }
-
-    internal suspend fun getGratitudeJournal(date: String, userId: String): List<GratitudeAndJoyJournal> {
-        return withAuth {
-            client.postgrest.from("gratitude_and_joy_journals")
-                .select {
-                    filter {
-                        eq("date", date)
-                        eq("user_id", userId)
-                    }
-                }
-                .decodeList<GratitudeAndJoyJournal>()
-        }.getOrElse { emptyList() }
-
-    }
-
     internal suspend fun getDailyTasks(date: String, userId: String): List<Task> {
         return withAuth { client.postgrest.from("tasks")
             .select {
@@ -452,21 +418,6 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
-    internal suspend fun getDailyFinances(date: String, userId: String): List<Transaction> {
-        return withAuth { client.postgrest.from("transactions")
-            .select {
-                filter {
-                    eq("date", date)
-                    eq("user_id", userId)
-                }
-                order("date", Order.DESCENDING)
-
-            }
-            .decodeList<Transaction>()
-        }.getOrElse { emptyList() }
-    }
-
-
     internal suspend fun getStepsData(date: String, userId: String): List<Steps> {
         return withAuth { client.postgrest.from("steps")
             .select {
@@ -476,30 +427,6 @@ class SupabaseHelper(private val context: Context) {
                 }
             }
             .decodeList<Steps>()
-        }.getOrElse { emptyList() }
-    }
-
-    internal suspend fun getWaterIntake(date: String, userId: String): List<WaterIntake> {
-        return withAuth { client.postgrest.from("water_intake")
-            .select {
-                filter {
-                    eq("date", date)
-                    eq("user_id", userId)
-                }
-            }
-            .decodeList<WaterIntake>()
-        }.getOrElse { emptyList() }
-    }
-
-    internal suspend fun getNutritionLogs(date: String, userId: String): List<NutritionLog> {
-        return withAuth { client.postgrest.from("nutrition_logs")
-            .select {
-                filter {
-                    eq("date", date)
-                    eq("user_id", userId)
-                }
-            }
-            .decodeList<NutritionLog>()
         }.getOrElse { emptyList() }
     }
 
@@ -513,42 +440,6 @@ class SupabaseHelper(private val context: Context) {
             }
             .decodeList<UserActivity>()
         }.getOrElse { emptyList() }
-    }
-
-    internal suspend fun getBodyMeasurements(date: String, userId: String): List<BodyMeasurement> {
-        return withAuth { client.postgrest.from("body_measurements")
-            .select {
-                filter {
-                    eq("date", date)
-                    eq("user_id", userId)
-                }
-            }
-            .decodeList<BodyMeasurement>()
-        }.getOrElse { emptyList() }
-    }
-
-    // Получение случайной мотивационной карточки
-    suspend fun getRandomMotivationalCard(): MotivationalCard {
-        return withAuth {
-            // Получаем все мотивационные карточки
-            val allCards = client.postgrest.from("motivational_cards")
-                .select()
-                .decodeList<MotivationalCard>()
-
-            // Выбираем случайную карточку
-            allCards.random()
-        }.getOrThrow()
-    }
-
-    // Добавим метод для получения карточки по ID
-    suspend fun getMotivationalCardById(cardId: Int): MotivationalCard {
-        return withAuth {
-            client.postgrest.from("motivational_cards")
-                .select {
-                    filter { eq("id", cardId) }
-                }
-                .decodeSingle<MotivationalCard>()
-        }.getOrThrow()
     }
 
     suspend fun getArticleCategories(): List<ArticleCategory> {
@@ -736,21 +627,6 @@ class SupabaseHelper(private val context: Context) {
                 .select()
                 .decodeList<TaskPriorityType>()
         }.getOrElse { emptyList() }
-    }
-
-
-    suspend fun isAvailableTasks(): Boolean {
-        return try {
-            // Простая проверка подключения к Supabase
-            client.postgrest.from("tasks")
-                .select {
-                    limit(1)
-                }
-                .decodeList<Any>().isNotEmpty()
-            true
-        } catch (e: Exception) {
-            false
-        }
     }
 
 }
