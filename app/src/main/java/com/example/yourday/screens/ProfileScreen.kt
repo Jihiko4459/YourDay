@@ -62,15 +62,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+// Экран профиля пользователя
 @Composable
 fun ProfileScreen(
     navController: NavController,
     supabaseHelper: SupabaseHelper
 ) {
+    // Состояния экрана:
     var profileData by remember { mutableStateOf<ProfileData?>(null) }
     var loading by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
+    //Загрузка данных при открытии
     LaunchedEffect(Unit) {
         try {
             val userId = supabaseHelper.client.auth.currentUserOrNull()?.id
@@ -234,6 +237,8 @@ fun ProfileScreen(
     }
 }
 
+
+// Компонент элемента меню профиля
 @Composable
 fun ProfileOptionItem(
     text: String,

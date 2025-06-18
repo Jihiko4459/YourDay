@@ -99,7 +99,7 @@ import java.util.Locale
 val mockTasks=mutableListOf<Task>()
 
 
-
+// Основная активность приложения, содержащая главный экран и навигацию
 class MainActivity : ComponentActivity() {
     private val authHelper by lazy { SupabaseHelper(applicationContext) }
     private val sharedPref by lazy { getSharedPreferences("YourDayPrefs", MODE_PRIVATE) }
@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Загрузка моковых задач из SharedPreferences
+        // Загрузка тестовых задач из SharedPreferences
         loadMockTasks()
 
         setContent {
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                         ) {
 
                         val context=LocalContext.current
-                        // Основной контент приложения
+                        // Навигационный граф приложения
                         NavHost(
                             navController = navController,
                             startDestination = "main",
@@ -219,16 +219,9 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun reloadDailyScreen() {
-        recreate()
+        recreate() // Пересоздаем активность для обновления
     }
-    // Вспомогательная функция для поиска NavController
-    private fun findNavController(): NavHostController {
-        // Здесь нужно реализовать поиск NavController в вашей иерархии View
-        // Это может потребовать рефакторинга, чтобы получить доступ к NavController из Activity
-        // Альтернативный вариант - передавать NavController в функцию reloadDailyScreen()
-        throw NotImplementedError("Implement findNavController() to locate your NavHostController")
-    }
-
+    // Загрузка тестовых задач из SharedPreferences
     private fun loadMockTasks() {
         val json = sharedPref.getString("mock_tasks", null)
         if (!json.isNullOrEmpty()) {
@@ -251,6 +244,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// Главный экран приложения
 @Composable
 fun MainScreen(
     supabaseHelper: SupabaseHelper,
@@ -292,6 +286,8 @@ fun MainScreen(
         }
     }
 }
+
+// Кастомная навигация с табами
 @Composable
 fun NavigationWithCustomMenu(
     navController: NavHostController,
@@ -394,7 +390,7 @@ fun NavigationWithCustomMenu(
 
 }
 
-
+// Экран ежедневника
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DailyScreen(
@@ -421,6 +417,7 @@ fun DailyScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        // Кастомный пикер даты
         CustomDatePicker(
             onDateSelected = { millis ->
                 selectedDate = millis
@@ -464,6 +461,7 @@ private fun convertMillisToDateString(millis: Long): String {
     return "$year-$month-$day"
 }
 
+// Секция задач
 @Composable
 private fun TasksSection(
     date: String,
@@ -578,7 +576,7 @@ private fun TasksSection(
 
 
 
-
+// Элемент задачи
 @Composable
 private fun TaskItem(
     task: Task,
@@ -685,7 +683,7 @@ private fun formatDate(dateString: String): String {
     }
 }
 
-// 3. GoalsSection
+//Секция цели
 @Composable
 private fun GoalsSection(
     date: String,
@@ -746,7 +744,7 @@ private fun GoalsSection(
                 }
 
                 IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
+                    onClick = {  }) {
                     Icon(
                         painter = painterResource(id = R.drawable.add_ic),
                         contentDescription = "Добавить цель",
@@ -782,7 +780,7 @@ private fun GoalsSection(
         }
     }
 }
-
+//Элемент цели
 @Composable
 private fun GoalItem(goalProgress: Goal) {
     Column {
@@ -827,7 +825,7 @@ private fun GoalItem(goalProgress: Goal) {
     }
 }
 
-// 4. IdeasSection
+// Секция идей
 @Composable
 private fun IdeasSection(
     date: String,
@@ -890,7 +888,7 @@ private fun IdeasSection(
                 }
 
                 IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
+                    onClick = {  }) {
                     Icon(
                         painter = painterResource(id = R.drawable.add_ic),
                         contentDescription = "Добавить идею",
@@ -925,7 +923,7 @@ private fun IdeasSection(
         }
     }
 }
-
+//Элемент идеи
 @Composable
 private fun IdeaItem(idea: Idea) {
     Row(modifier = Modifier.padding(vertical = 4.dp)) {
@@ -943,7 +941,7 @@ private fun IdeaItem(idea: Idea) {
 }
 
 
-
+//Экран здоровье и фитнес
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HealthAndFitnessScreen(supabaseHelper: SupabaseHelper) {
@@ -969,6 +967,7 @@ fun HealthAndFitnessScreen(supabaseHelper: SupabaseHelper) {
         ActivitySection(dateStr, userId, supabaseHelper)
     }
 }
+//Секция шагов
 @Composable
 private fun StepsSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
     var steps by remember { mutableStateOf<List<Steps>>(emptyList()) }
@@ -1065,7 +1064,7 @@ private fun StepsSection(date: String, userId: String, supabaseHelper: SupabaseH
 
 
 
-
+// Нижняя панель навигации
 @Composable
 fun BottomNavigationBar(navController: NavHostController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -1194,7 +1193,7 @@ fun BottomNavigationBar(navController: NavHostController) {
         }
     }
 }
-
+//Секция активности пользователя
 @Composable
 private fun ActivitySection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
     var activities by remember { mutableStateOf<List<UserActivity>>(emptyList()) }
@@ -1255,7 +1254,7 @@ private fun ActivitySection(date: String, userId: String, supabaseHelper: Supaba
                 }
 
                 IconButton(
-                    onClick = { onIntentToAddScreenTask() }) {
+                    onClick = {  }) {
                     Icon(
                         painter = painterResource(id = R.drawable.add_ic),
                         contentDescription = "Добавить активность",
@@ -1290,7 +1289,7 @@ private fun ActivitySection(date: String, userId: String, supabaseHelper: Supaba
         }
     }
 }
-
+//Элемент активности
 @Composable
 fun ActivityItem(activity: UserActivity) {
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
@@ -1303,15 +1302,6 @@ fun ActivityItem(activity: UserActivity) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
-}
-
-
-private fun onIntentToAddScreenTask(){
-
-}
-
-private fun onIntentToAddScreenNote(){
-
 }
 
 

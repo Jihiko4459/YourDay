@@ -52,19 +52,24 @@ import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Primary
 import com.example.yourday.ui.theme.Purple1
 
-
+// Основной экран со статьями
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticlesScreen(
     navController: NavController,
     onIntentToDetails: (articleId: Int) -> Unit
 ) {
+    // Получаем контекст приложения
     val context = LocalContext.current
+    // Инициализируем хелпер для работы с Supabase
     val supabaseHelper= remember { SupabaseHelper(context.applicationContext) }
+
+    // Состояния экрана:
     var selectedCategory by remember { mutableStateOf<ArticleCategory?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var isError by remember { mutableStateOf(false) }
 
+    // Загрузка данных при первом открытии экрана
     LaunchedEffect(Unit) {
         val success = ArticleData.loadData(supabaseHelper)
         if (!success) {
@@ -77,10 +82,13 @@ fun ArticlesScreen(
         isLoading = false
     }
 
+
     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
         if (isLoading) {
+            // Показываем индикатор загрузки
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
+            // Основной контент после загрузки
             Column {
                 Row(
                     modifier = Modifier
@@ -99,7 +107,7 @@ fun ArticlesScreen(
                         textAlign = TextAlign.Center
                     )
                 }
-
+                //Категории
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -120,7 +128,7 @@ fun ArticlesScreen(
                         )
                     }
                 }
-
+                //Список статей
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(ArticleData.getArticlesByCategory(selectedCategory?.id)) { article ->
                         ArticleCard(
@@ -136,7 +144,7 @@ fun ArticlesScreen(
     }
 }
 
-
+//Карточка статьи
 @Composable
 fun ArticleCard(
     article: Article,

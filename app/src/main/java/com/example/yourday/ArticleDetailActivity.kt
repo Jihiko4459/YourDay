@@ -44,6 +44,8 @@ import com.example.yourday.data.MockArticleRepository
 import com.example.yourday.model.Article
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
+
+// Основная активность для отображения деталей статьи
 class ArticleDetailActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,6 +80,7 @@ class ArticleDetailActivity : ComponentActivity() {
     }
 }
 
+// Экран детального просмотра статьи
 @Composable
 fun ArticleDetailScreen(articleId: Int) {
     val context = LocalContext.current

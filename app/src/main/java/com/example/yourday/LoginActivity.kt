@@ -74,7 +74,7 @@ import com.example.yourday.ui.theme.White
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.launch
 
-
+// Активность для экрана входа в приложение
 class LoginActivity : ComponentActivity() {
     private val authHelper by lazy { SupabaseHelper(applicationContext) }
 
@@ -130,7 +130,7 @@ class LoginActivity : ComponentActivity() {
             }
         }
     }
-
+    // Обработка входа пользователя
     private suspend fun handleLogin(email: String, password: String, rememberMe: Boolean) {
         try {
             val result = authHelper.signInWithEmail(email, password)
@@ -157,12 +157,13 @@ class LoginActivity : ComponentActivity() {
             handleLoginError(e)
         }
     }
-
+    // Переход на главный экран
     private fun intentToMainActivity() {
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
 
+    // Обработка ошибок входа
     private fun handleLoginError(error: Exception) {
         val message = when {
             error.message?.contains("Invalid login credentials") == true -> {
@@ -174,14 +175,17 @@ class LoginActivity : ComponentActivity() {
         Log.e("LOGIN", "Error details", error)
     }
 
+    // Проверка валидности email
     private fun isValidEmail(email: String): Boolean {
         return Patterns.EMAIL_ADDRESS.matcher(email).matches()
     }
 
+    // Показать Toast сообщение
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
+    // Валидация пароля
     private fun validatePassword(password: String): Boolean {
         return when {
             password.isEmpty() -> {
@@ -216,14 +220,14 @@ class LoginActivity : ComponentActivity() {
         }
     }
 
-    // Обработка кнопки "Назад"
+    // Обработка нажатия кнопки "Назад"
     override fun onBackPressed() {
         super.onBackPressed()
-        // Дополнительные действия при необходимости
         finish() // Закрывает текущую Activity
     }
 }
 
+// Экран входа
 @Composable
 fun LoginScreen(
     onLoginClick: (email: String, password: String, rememberMe: Boolean) -> Unit,

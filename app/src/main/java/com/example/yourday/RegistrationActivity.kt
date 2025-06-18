@@ -76,6 +76,8 @@ val isDarkTheme: Boolean
     @Composable
     get() = GetIsDarkTheme()
 
+
+// Основной класс активности для регистрации пользователя
 class RegistrationActivity : ComponentActivity() {
     private val authHelper by lazy { SupabaseHelper(applicationContext) }
 
@@ -125,6 +127,7 @@ class RegistrationActivity : ComponentActivity() {
         }
     }
 
+    // Обработка регистрации пользователя
     private suspend fun handleRegistration(email: String, password: String) {
         try {
             val result = authHelper.signUpWithEmail(email, password)
@@ -142,12 +145,14 @@ class RegistrationActivity : ComponentActivity() {
         }
     }
 
+    // Обработка ошибок регистрации
     private fun intentToLastStepToRegistration(userId: String) {
         startActivity(Intent(this, LastStepToRegistrationActivity::class.java).apply {
             putExtra("USER_ID", userId)
         })
     }
 
+    // Переход к экрану входа
     private fun handleRegistrationError(error: Exception) {
         val message = when {
             error.message?.contains("User from sub claim in JWT does not exist") == true -> {
@@ -160,10 +165,12 @@ class RegistrationActivity : ComponentActivity() {
         Log.e("REGISTRATION", "Error details", error)
     }
 
+    // Проверка валидности email
     private fun intentToLogin() {
         startActivity(Intent(this, LoginActivity::class.java))
     }
 
+    // Показать Toast сообщение
     private fun isValidEmail(email: String): Boolean {
         return Patterns.EMAIL_ADDRESS.matcher(email).matches()
     }
@@ -177,6 +184,14 @@ class RegistrationActivity : ComponentActivity() {
         finish()
     }
 
+    // Валидация пароля с проверками:
+    // - не пустой
+    // - длина от 8 до 32 символов
+    // - содержит цифры
+    // - содержит буквы
+    // - содержит спецсимволы
+    // - содержит заглавные буквы
+    // - совпадение паролей
     private fun validatePassword(password: String, confirmPassword: String): Boolean {
         return when {
             password.isEmpty() -> {
@@ -216,6 +231,8 @@ class RegistrationActivity : ComponentActivity() {
     }
 }
 
+
+// Composable функция для экрана регистрации
 @Composable
 fun RegistrationScreen(
     onRegisterClick: (email: String, password: String, confirmPassword: String) -> Unit,

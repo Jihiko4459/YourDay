@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-
+// Активность для завершающего шага регистрации пользователя
 class LastStepToRegistrationActivity : ComponentActivity() {
     private val authHelper by lazy { SupabaseHelper(applicationContext) }
 
@@ -178,7 +178,7 @@ class LastStepToRegistrationActivity : ComponentActivity() {
 
 
 }
-
+// Экран последнего шага регистрации
 @Composable
 fun LastStepToRegistrationScreen(
     onRegisterClick: (nickname: String, birthDate: String, termsAccepted: Boolean) -> Unit,

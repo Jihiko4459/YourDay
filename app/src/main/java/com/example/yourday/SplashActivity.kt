@@ -29,6 +29,7 @@ import com.example.yourday.ui.theme.Primary
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.delay
 
+// Активность для отображения splash-экрана при запуске приложения
 class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +49,8 @@ class SplashActivity : ComponentActivity() {
         }
     }
 }
+
+// Composable функция для отображения splash-экрана
 @Composable
 fun SplashScreen(context: Context) {
 
