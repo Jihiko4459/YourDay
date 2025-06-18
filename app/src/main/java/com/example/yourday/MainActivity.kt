@@ -182,7 +182,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                            composable("profile") { ProfileScreen(navController) }
+                            composable("profile") {
+                                ProfileScreen(
+                                    navController = navController,
+                                    supabaseHelper = authHelper  // Pass the authHelper here
+                                )
+                            }
                             composable("daily") {
                                 DailyScreen(
                                     supabaseHelper = authHelper,
@@ -410,6 +415,8 @@ fun DailyScreen(
     val userId = getUserId(context)
     val dateStr = convertMillisToDateString(selectedDate)
 
+    var refreshTrigger by remember { mutableStateOf(0) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -417,7 +424,10 @@ fun DailyScreen(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         CustomDatePicker(
-            onDateSelected = { millis -> selectedDate = millis },
+            onDateSelected = { millis ->
+                selectedDate = millis
+                refreshTrigger++ // Trigger refresh when date changes
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 22.dp)
@@ -432,10 +442,11 @@ fun DailyScreen(
                 userId,
                 supabaseHelper,
                 onTaskClick = onTaskClick,
-                onAddTaskClick = onAddTaskClick // Передаем функцию
+                onAddTaskClick = onAddTaskClick,
+                refreshTrigger = refreshTrigger // Pass the refresh trigger
             )
-            GoalsSection(dateStr, userId, supabaseHelper)
-            IdeasSection(dateStr, userId, supabaseHelper)
+            GoalsSection(dateStr, userId, supabaseHelper, refreshTrigger)
+            IdeasSection(dateStr, userId, supabaseHelper, refreshTrigger)
         }
     }
 }
@@ -456,7 +467,8 @@ private fun TasksSection(
     userId: String,
     supabaseHelper: SupabaseHelper,
     onTaskClick: (Int) -> Unit,
-    onAddTaskClick: () -> Unit // Добавляем новый параметр
+    onAddTaskClick: () -> Unit,
+    refreshTrigger: Int // Add refresh trigger parameter
 ) {
 
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
@@ -473,7 +485,7 @@ private fun TasksSection(
     }
 
     // Initial load
-    LaunchedEffect(date) {
+    LaunchedEffect(date, refreshTrigger) {
         refreshTasks()
     }
 
@@ -586,7 +598,7 @@ private fun TaskItem(
 
                         withContext(Dispatchers.Main) {
                             if (success) {
-                                onTaskUpdated()
+                                onTaskUpdated() // This will trigger the refresh
                                 ToastManager.show(
                                     if (isChecked) "Task completed!" else "Task marked incomplete",
                                     ToastType.SUCCESS,
@@ -630,10 +642,20 @@ private fun TaskItem(
                 style = TextStyle(
                     fontSize = 16.sp,
                     fontFamily = FontFamily(Font(R.font.roboto_regular)),
-                    color = DarkBlue
+                    color = if (task.isCompleted) Gray1.copy(alpha = 0.6f) else DarkBlue
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (task.isCompleted && !task.completedAt.isNullOrEmpty()) {
+                Text(
+                    text = "Выполнено: ${formatDate(task.completedAt)}",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily(Font(R.font.roboto_regular)),
+                        color = Gray1.copy(alpha = 0.6f)
+                    )
+                )
+            }
         }
     }
 
@@ -644,14 +666,30 @@ private fun getCurrentDate(): String {
     return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 }
 
+private fun formatDate(dateString: String): String {
+    return try {
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val outputFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+        val date = inputFormat.parse(dateString)
+        outputFormat.format(date)
+    } catch (e: Exception) {
+        dateString // Return original if parsing fails
+    }
+}
+
 // 3. GoalsSection
 @Composable
-private fun GoalsSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+private fun GoalsSection(
+    date: String,
+    userId: String,
+    supabaseHelper: SupabaseHelper,
+    refreshTrigger: Int // Add refresh trigger
+) {
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(date) {
+    LaunchedEffect(date, refreshTrigger) {
         isLoading = true
         error = null
         try {
@@ -784,12 +822,18 @@ private fun GoalItem(goalProgress: Goal) {
 
 // 4. IdeasSection
 @Composable
-private fun IdeasSection(date: String, userId: String, supabaseHelper: SupabaseHelper) {
+private fun IdeasSection(
+    date: String,
+    userId: String,
+    supabaseHelper: SupabaseHelper,
+    refreshTrigger: Int // Add refresh trigger
+) {
+
     var ideas by remember { mutableStateOf<List<Idea>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(date) {
+    LaunchedEffect(date, refreshTrigger) {
         isLoading = true
         error = null
         try {

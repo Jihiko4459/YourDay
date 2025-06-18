@@ -380,15 +380,16 @@ class SupabaseHelper(private val context: Context) {
 
 
     internal suspend fun getDailyTasks(date: String, userId: String): List<Task> {
-        return withAuth { client.postgrest.from("tasks")
-            .select {
-                filter {
-                    lte("created_at", date)
-                    gte("due_date", date)
-                    eq("user_id", userId)
+        return withAuth {
+            client.postgrest.from("tasks")
+                .select {
+                    filter {
+                        lte("created_at", date)
+                        gte("due_date", date)
+                        eq("user_id", userId)
+                    }
                 }
-            }
-            .decodeList<Task>()
+                .decodeList<Task>()
         }.getOrElse { emptyList() }
     }
 
@@ -599,27 +600,27 @@ class SupabaseHelper(private val context: Context) {
         description: String? = null
     ): Boolean {
         return try {
-            val updates = mutableMapOf<String, String?>()
+            val updates = mutableMapOf<String, Any?>() // Changed to Any? to handle null values
 
-            isCompleted?.let { updates["is_completed"] = it.toString() }
-            completedAt?.let { updates["completed_at"] = it }
+            isCompleted?.let { updates["is_completed"] = it }
+            completedAt?.let {
+                if (it.isEmpty()) {
+                    updates["completed_at"] = null // Explicitly set to null to clear the field
+                } else {
+                    updates["completed_at"] = it
+                }
+            }
             title?.let { updates["title"] = it }
             description?.let { updates["description"] = it }
 
-            // Filter out null values
-            val nonNullUpdates = updates.filterValues { it != null }
-
-            if (nonNullUpdates.isNotEmpty()) {
-                client.from("tasks")
-                    .update(nonNullUpdates) {
-                        filter {
-                            eq("id", taskId)
-                        }
+            // Execute the update
+            client.from("tasks")
+                .update(updates.filterValues { it != null }) {
+                    filter {
+                        eq("id", taskId)
                     }
-                true
-            } else {
-                false
-            }
+                }
+            true
         } catch (e: Exception) {
             log.e(e) { "Error updating task with ID $taskId" }
             false
