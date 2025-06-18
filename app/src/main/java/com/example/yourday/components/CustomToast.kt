@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.yourday.R
+import com.example.yourday.ui.theme.Blue
 import com.example.yourday.ui.theme.Green
 import com.example.yourday.ui.theme.Red
 import com.example.yourday.ui.theme.White
@@ -40,7 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class ToastType {
-    SUCCESS, ERROR
+    SUCCESS, ERROR, INFO
 }
 
 enum class ToastDuration(val timeMillis: Long) {
@@ -58,11 +59,13 @@ fun CustomToast(
     val backgroundColor = when (type) {
         ToastType.SUCCESS -> Green
         ToastType.ERROR -> Red
+        ToastType.INFO -> Blue
     }
 
     val iconRes = when (type) {
         ToastType.SUCCESS -> R.drawable.check_circle2
         ToastType.ERROR -> R.drawable.check_circle
+        ToastType.INFO -> R.drawable.check_circle
     }
 
     Box(
@@ -144,50 +147,6 @@ object ToastManager {
     }
 }
 
-@Composable
-fun ManagedCustomToast() {
-    AnimatedVisibility(
-        visible = ToastManager.showToast,
-        enter = fadeIn(animationSpec = tween(durationMillis = 300)),
-        exit = fadeOut(animationSpec = tween(durationMillis = 500))
-    ) {
-        if (ToastManager.showToast) {
-            CustomToast(
-                message = ToastManager.toastMessage,
-                type = ToastManager.toastType
-            )
-        }
-    }
-}
-
-// Helper functions for backward compatibility
-@Composable
-fun CustomToastGreen(
-    message: String,
-    duration: ToastDuration = ToastDuration.SHORT,
-    modifier: Modifier = Modifier
-) {
-    CustomToast(
-        message = message,
-        type = ToastType.SUCCESS,
-        duration = duration,
-        modifier = modifier
-    )
-}
-
-@Composable
-fun CustomToastRed(
-    message: String,
-    duration: ToastDuration = ToastDuration.SHORT,
-    modifier: Modifier = Modifier
-) {
-    CustomToast(
-        message = message,
-        type = ToastType.ERROR,
-        duration = duration,
-        modifier = modifier
-    )
-}
 
 @Preview
 @Composable

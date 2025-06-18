@@ -8,7 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,15 +29,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExposedDropdownMenuDefaults.outlinedTextFieldColors
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,7 +53,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -68,6 +66,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.yourday.api.SupabaseHelper
+import com.example.yourday.data.TaskMetadataRepository
+import com.example.yourday.data.TaskRepository
 import com.example.yourday.model.Task
 import com.example.yourday.model.TaskPriorityType
 import com.example.yourday.model.TaskType
@@ -82,26 +82,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Mock data for when Supabase fails
-val mockTaskTypes = listOf(
-    TaskType(1, "Работа", "work_ic"),
-    TaskType(2, "Учёба", "study_ic"),
-    TaskType(3, "Здоровье", "health_ic"),
-    TaskType(4, "Семья", "family_ic"),
-    TaskType(5, "Друзья", "friends_ic"),
-    TaskType(6, "Хобби", "hobby_ic"),
-    TaskType(7, "Финансы", "finance_ic"),
-    TaskType(8, "Личное", "personal_ic")
-)
-
-val mockPriorities = listOf(
-    TaskPriorityType(1, "Низкий (Не срочно и не критично)"),
-    TaskPriorityType(2, "Средний (Важно, но не срочно)"),
-    TaskPriorityType(3, "Высокий (Срочно и важно)")
-)
 
 class TaskActivity : ComponentActivity() {
-    private val supabaseHelper by lazy { SupabaseHelper() }
+    private val supabaseHelper by lazy { SupabaseHelper(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,17 +114,27 @@ class TaskActivity : ComponentActivity() {
                 ) {
                     composable("taskDetail") {
                         TaskDetailScreen(
-                            taskId = null,
+                            taskId = intent.getIntExtra("taskId", 0).takeIf { it != 0 },
                             supabaseHelper = supabaseHelper,
-                            onBack = { finish() }
+                            onBack = { finish() },
+                            onTaskSaved = {
+                                // Устанавливаем результат, который будет обработан в MainActivity
+                                setResult(RESULT_OK)
+                                finish()
+                            }
                         )
                     }
                     composable("taskDetail/{taskId}") { backStackEntry ->
                         val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull()
                         TaskDetailScreen(
-                            taskId = taskId,
+                            taskId = intent.getIntExtra("taskId", 0).takeIf { it != 0 },
                             supabaseHelper = supabaseHelper,
-                            onBack = { finish() }
+                            onBack = { finish() },
+                            onTaskSaved = {
+                                // Устанавливаем результат, который будет обработан в MainActivity
+                                setResult(RESULT_OK)
+                                finish()
+                            }
                         )
                     }
                 }
@@ -160,7 +153,8 @@ fun getUserId(context: Context): String {
 fun TaskDetailScreen(
     taskId: Int?,
     supabaseHelper: SupabaseHelper,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onTaskSaved: () -> Unit // Новый параметр для callback
 ) {
     val context = LocalContext.current
     val userId = getUserId(context)
@@ -175,11 +169,27 @@ fun TaskDetailScreen(
     var description by remember { mutableStateOf("") }
     var selectedTaskType by remember { mutableStateOf<TaskType?>(null) }
     var selectedPriority by remember { mutableStateOf<TaskPriorityType?>(null) }
-    var dueDate by remember { mutableStateOf("") }
+
+    // Для внутреннего хранения даты в формате yyyy-MM-dd
+    var internalDueDate by remember {
+        mutableStateOf(
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        )
+    }
+
+    // Для отображения даты в формате dd.MM.yyyy
+    var displayDueDate by remember(internalDueDate) {
+        mutableStateOf(
+            try {
+                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(internalDueDate)
+                SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(date)
+            } catch (e: Exception) {
+                internalDueDate
+            }
+        )
+    }
 
     // Dropdown states
-    var taskTypeDropdownExpanded by remember { mutableStateOf(false) }
-    var priorityDropdownExpanded by remember { mutableStateOf(false) }
     var taskTypes by remember { mutableStateOf<List<TaskType>>(emptyList()) }
     var priorities by remember { mutableStateOf<List<TaskPriorityType>>(emptyList()) }
 
@@ -187,37 +197,33 @@ fun TaskDetailScreen(
     LaunchedEffect(Unit) {
         isLoading = true
         try {
-            taskTypes = supabaseHelper.getTaskTypes()
-            priorities = supabaseHelper.getTaskPriorities()
+            taskTypes = TaskMetadataRepository.getTaskTypes(supabaseHelper)
+            priorities = TaskMetadataRepository.getTaskPriorities(supabaseHelper)
         } catch (e: Exception) {
-            error = "Failed to load task types: ${e.message}"
-            taskTypes = mockTaskTypes
-            priorities = mockPriorities
+            error = "Не удалось загрузить типы задач. Используются локальные данные."
+            taskTypes = TaskMetadataRepository.mockTaskTypes
+            priorities = TaskMetadataRepository.mockPriorities
         } finally {
             isLoading = false
         }
     }
 
-    // Load task if editing existing one
+    // Load task data when taskId changes
     LaunchedEffect(taskId) {
         if (taskId != null && !isEditing) {
             isLoading = true
-            try {
-                task = supabaseHelper.getTaskById(taskId, userId)
-                title = task?.title ?: ""
-                description = task?.description ?: ""
-                task?.taskTypeId?.let { typeId ->
-                    selectedTaskType = taskTypes.find { it.id == typeId }
-                }
-                task?.priorityId?.let { priorityId ->
-                    selectedPriority = priorities.find { it.id == priorityId }
-                }
-                dueDate = task?.dueDate ?: ""
-            } catch (e: Exception) {
-                error = "Failed to load task: ${e.message}"
-            } finally {
-                isLoading = false
+            task = TaskRepository.getTaskById(taskId, userId, supabaseHelper)
+            // Update fields with loaded task data
+            title = task?.title ?: ""
+            description = task?.description ?: ""
+            task?.taskTypeId?.let { typeId ->
+                selectedTaskType = taskTypes.find { it.id == typeId }
             }
+            task?.priorityId?.let { priorityId ->
+                selectedPriority = priorities.find { it.id == priorityId }
+            }
+            internalDueDate = task?.dueDate ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            isLoading = false
         }
     }
 
@@ -233,7 +239,9 @@ fun TaskDetailScreen(
         ) {
             // Header similar to MainScreen
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -366,53 +374,57 @@ fun TaskDetailScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
+                    // For Task Type dropdown
                     if (isEditing) {
-                        Box(modifier = Modifier.fillMaxWidth()) {
+                        var expanded by remember { mutableStateOf(false) }
+
+                        ExposedDropdownMenuBox(
+                            expanded = expanded,
+                            onExpandedChange = { expanded = !expanded },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             OutlinedTextField(
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
+                                readOnly = true,
                                 value = selectedTaskType?.typeName ?: "",
                                 onValueChange = {},
-                                modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
                                 trailingIcon = {
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                                 },
                                 placeholder = { Text("Выберите тип задачи") },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = outlinedTextFieldColors(
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
                                     focusedBorderColor = Primary,
                                     unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                )
+                                ),
+                                shape = RoundedCornerShape(12.dp)
                             )
-                            DropdownMenu(
-                                expanded = taskTypeDropdownExpanded,
-                                onDismissRequest = { taskTypeDropdownExpanded = false },
-                                modifier = Modifier.fillMaxWidth()
+
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier.exposedDropdownSize()
                             ) {
                                 taskTypes.forEach { type ->
                                     DropdownMenuItem(
                                         text = { Text(type.typeName) },
                                         onClick = {
                                             selectedTaskType = type
-                                            taskTypeDropdownExpanded = false
+                                            expanded = false
                                         }
                                     )
                                 }
                             }
                         }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .alpha(0f)
-                                .clickable { taskTypeDropdownExpanded = true }
-                        )
                     } else {
                         Text(
-                            text = selectedTaskType?.typeName ?: "Не указано",
+                            text = selectedTaskType?.typeName ?: "Не выбрано",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
+
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -423,53 +435,62 @@ fun TaskDetailScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
+                    // Priority dropdown - исправленная версия
                     if (isEditing) {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = selectedPriority?.typeName ?: "",
-                                onValueChange = {},
-                                modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
-                                trailingIcon = {
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                                },
-                                placeholder = { Text("Выберите приоритет") },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = outlinedTextFieldColors(
-                                    focusedBorderColor = Primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                )
-                            )
-                            DropdownMenu(
-                                expanded = priorityDropdownExpanded,
-                                onDismissRequest = { priorityDropdownExpanded = false },
+                        var priorityExpanded by remember { mutableStateOf(false) }
+
+                        // Проверка на пустой список приоритетов
+                        if (priorities.isEmpty()) {
+                            Text("Нет доступных приоритетов", color = MaterialTheme.colorScheme.error)
+                        } else {
+                            ExposedDropdownMenuBox(
+                                expanded = priorityExpanded,
+                                onExpandedChange = { priorityExpanded = it },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                priorities.forEach { priority ->
-                                    DropdownMenuItem(
-                                        text = { Text(priority.typeName) },
-                                        onClick = {
-                                            selectedPriority = priority
-                                            priorityDropdownExpanded = false
-                                        }
-                                    )
+                                OutlinedTextField(
+                                    modifier = Modifier
+                                        .menuAnchor()
+                                        .fillMaxWidth(),
+                                    readOnly = true,
+                                    value = selectedPriority?.typeName ?: "",
+                                    onValueChange = {},
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityExpanded)
+                                    },
+                                    placeholder = { Text("Выберите приоритет") },
+                                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                                        focusedBorderColor = Primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = priorityExpanded,
+                                    onDismissRequest = { priorityExpanded = false },
+                                    modifier = Modifier.exposedDropdownSize()
+                                ) {
+                                    priorities.forEach { priority ->
+                                        DropdownMenuItem(
+                                            text = { Text(priority.typeName) },
+                                            onClick = {
+                                                selectedPriority = priority
+                                                priorityExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .alpha(0f)
-                                .clickable { priorityDropdownExpanded = true }
-                        )
                     } else {
                         Text(
-                            text = selectedPriority?.typeName ?: "Не указано",
+                            text = selectedPriority?.typeName ?: "Не выбрано",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
+
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -481,28 +502,68 @@ fun TaskDetailScreen(
                     )
 
                     if (isEditing) {
+                        // Добавляем валидацию даты
+                        val isDateValid = remember(displayDueDate) {
+                            try {
+                                SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).parse(displayDueDate)
+                                true
+                            } catch (e: Exception) {
+                                false
+                            }
+                        }
+
                         OutlinedTextField(
-                            value = dueDate,
-                            onValueChange = { dueDate = it },
+                            value = displayDueDate,
+                            onValueChange = { newValue ->
+                                // Ограничиваем длину и разрешаем только цифры и точки
+                                if (newValue.length <= 10 && newValue.matches(Regex("[0-9.]*"))) {
+                                    displayDueDate = newValue
+
+                                    // Пытаемся преобразовать введенную дату в формат для Supabase
+                                    try {
+                                        val parsedDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).parse(newValue)
+                                        if (parsedDate != null) {
+                                            internalDueDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(parsedDate)
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ошибка преобразования - оставляем предыдущее значение
+                                    }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("ДД.ММ.ГГГГ") },
-                            visualTransformation = DateTransformation(),
+                            placeholder = { Text("дд.мм.гггг") },
+                            isError = !isDateValid,
+                            supportingText = {
+                                if (!isDateValid) {
+                                    Text("Используйте формат дд.мм.гггг")
+                                }
+                            },
                             shape = RoundedCornerShape(12.dp),
                             colors = outlinedTextFieldColors(
                                 focusedBorderColor = Primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                errorBorderColor = Red
                             )
                         )
                     } else {
                         Text(
-                            text = dueDate,
+                            text = if (internalDueDate.isNotEmpty()) {
+                                try {
+                                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(internalDueDate)
+                                    SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(date)
+                                } catch (e: Exception) {
+                                    internalDueDate
+                                }
+                            } else "Не указано",
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
 
+
                     Spacer(modifier = Modifier.height(32.dp))
 
+                    // Bottom buttons
                     // Bottom buttons
                     Row(
                         modifier = Modifier
@@ -514,12 +575,8 @@ fun TaskDetailScreen(
                             Button(
                                 onClick = {
                                     CoroutineScope(Dispatchers.IO).launch {
-                                        try {
-                                            supabaseHelper.deleteTask(taskId)
-                                            onBack()
-                                        } catch (e: Exception) {
-                                            error = "Failed to delete task: ${e.message}"
-                                        }
+                                        TaskRepository.deleteTask(taskId!!, userId, supabaseHelper)
+                                        onBack()
                                     }
                                 },
                                 shape = RoundedCornerShape(12.dp),
@@ -539,6 +596,19 @@ fun TaskDetailScreen(
 
                         Button(
                             onClick = {
+                                // Объявляем переменную для даты выполнения
+                                val finalDueDate = try {
+                                    val parsedDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).parse(displayDueDate)
+                                    // Если дата валидна, сохраняем в internalDueDate в формате yyyy-MM-dd
+                                    if (parsedDate != null) {
+                                        internalDueDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(parsedDate)
+                                    }
+                                    internalDueDate
+                                } catch (e: Exception) {
+                                    // Если дата невалидна, используем текущую дату
+                                    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                                }
+
                                 val currentTask = Task(
                                     id = taskId ?: 0,
                                     userId = userId,
@@ -547,17 +617,23 @@ fun TaskDetailScreen(
                                     taskTypeId = selectedTaskType?.id,
                                     priorityId = selectedPriority?.id,
                                     createdAt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
-                                    dueDate = dueDate,
+                                    dueDate = try {
+                                        val parsedDate = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).parse(displayDueDate)
+                                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(parsedDate)
+                                    } catch (e: Exception) {
+                                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                                    },
                                     isCompleted = task?.isCompleted ?: false,
-                                    completedAt = ""
+                                    completedAt = task?.completedAt ?: ""
                                 )
 
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        supabaseHelper.saveTask(currentTask)
-                                        onBack()
+                                        TaskRepository.saveTask(currentTask, supabaseHelper)
+                                        onTaskSaved()
                                     } catch (e: Exception) {
-                                        error = "Failed to save task: ${e.message}"
+                                        // Обработка ошибки сохранения
+                                        error = "Ошибка при сохранении задачи: ${e.message}"
                                     }
                                 }
                             },

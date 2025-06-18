@@ -439,20 +439,27 @@ data class TaskType(
     @SerialName("type_icon") val typeIcon: String? = null
 )
 
-// Tasks
 @Serializable
 data class Task(
-    @SerialName("id") val id: Int,
+    @SerialName("id") val id: Int = 0,
     @SerialName("user_id") val userId: String,
     @SerialName("title") val title: String,
-    @SerialName("description") val description: String?,
+    @SerialName("description") val description: String,
     @SerialName("task_type_id") val taskTypeId: Int?,
     @SerialName("priority_id") val priorityId: Int?,
-    @SerialName("created_at") val createdAt: String,
-    @SerialName("due_date") val dueDate: String?,
-    @SerialName("is_dependent") val isDependent: Boolean = false,
-    @SerialName("is_completed") val isCompleted: Boolean = false,
-    @SerialName("completed_at") val completedAt: String?
+    @SerialName("created_at")
+    @Serializable(with = LocalDateSerializer::class)
+    val createdAt: String,
+    @SerialName("due_date")
+    @Serializable(with = LocalDateSerializer::class)
+    val dueDate: String,
+    @SerialName("is_dependent")
+    val isDependent: Boolean = false,
+    @SerialName("is_completed")
+    val isCompleted: Boolean = false,
+    @SerialName("completed_at")
+    @Serializable(with = LocalDateSerializer::class)
+    val completedAt: String = ""  // Default empty string handles null values
 )
 
 // Themes

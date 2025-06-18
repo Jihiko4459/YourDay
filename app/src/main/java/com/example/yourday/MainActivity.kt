@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,6 +66,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.yourday.api.SupabaseHelper
+import com.example.yourday.data.TaskRepository
 import com.example.yourday.model.Goal
 import com.example.yourday.model.Idea
 import com.example.yourday.model.Steps
@@ -79,6 +81,8 @@ import com.example.yourday.ui.theme.Primary
 import com.example.yourday.ui.theme.Purple1
 import com.example.yourday.ui.theme.White
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import java.util.Calendar
 
 
@@ -94,13 +98,17 @@ val mockUA=mutableListOf<UserActivity>()
 
 
 class MainActivity : ComponentActivity() {
-    private val authHelper by lazy { SupabaseHelper() }
-
+    private val authHelper by lazy { SupabaseHelper(applicationContext) }
+    private val sharedPref by lazy { getSharedPreferences("YourDayPrefs", MODE_PRIVATE) }
+    private val gson by lazy { Gson() }
 
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Load mock tasks from SharedPreferences
+        loadMockTasks()
 
         setContent {
             YourDayTheme {
@@ -131,6 +139,8 @@ class MainActivity : ComponentActivity() {
                                 .calculateBottomPadding()
                         )
                         ) {
+
+                        val context=LocalContext.current
                         // Основной контент
                         NavHost(
                             navController = navController,
@@ -141,31 +151,40 @@ class MainActivity : ComponentActivity() {
                                 MainScreen(
                                     supabaseHelper = authHelper,
                                     onTaskClick = { taskId ->
-                                        val intent = Intent(this@MainActivity, TaskActivity::class.java).apply {
+                                        val intent = Intent(context, TaskActivity::class.java).apply {
                                             putExtra("taskId", taskId)
                                         }
-                                        startActivity(intent)
+                                        taskActivityResultLauncher.launch(intent)
+                                    },
+                                    onAddTaskClick = {
+                                        val intent = Intent(context, TaskActivity::class.java)
+                                        taskActivityResultLauncher.launch(intent)
                                     }
                                 )
                             }
-                            composable("articles") { ArticlesScreen(
-                                navController,
-                                onIntentToDetails = {articleId ->
-                                    articleId?.let {
+                            composable("articles") {
+                                ArticlesScreen(
+                                    navController,
+                                    onIntentToDetails = { articleId ->
                                         startActivity(Intent(this@MainActivity, ArticleDetailActivity::class.java).apply {
-                                            putExtra("article_id", articleId)
+                                            putExtra("articleId", articleId)  // Pass just the ID
                                         })
                                     }
-                                }) }
-                            composable("profile") { ProfileScreen() }
+                                )
+                            }
+                            composable("profile") { ProfileScreen(navController) }
                             composable("daily") {
                                 DailyScreen(
                                     supabaseHelper = authHelper,
-                                    onTaskClick ={ taskId ->
-                                        val intent = Intent(this@MainActivity, TaskActivity::class.java).apply {
+                                    onTaskClick = { taskId ->
+                                        val intent = Intent(context, TaskActivity::class.java).apply {
                                             putExtra("taskId", taskId)
                                         }
-                                        startActivity(intent)
+                                        taskActivityResultLauncher.launch(intent)
+                                    },
+                                    onAddTaskClick = {
+                                        val intent = Intent(context, TaskActivity::class.java)
+                                        taskActivityResultLauncher.launch(intent)
                                     }
                                 )
                             }
@@ -179,6 +198,43 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+
+
+    private val taskActivityResultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            // Перезагружаем DailyScreen при возврате из TaskActivity
+            reloadDailyScreen()
+        }
+    }
+    private fun reloadDailyScreen() {
+        // Здесь можно обновить данные или просто перезагрузить экран
+        // Например, можно использовать флаг для принудительного обновления
+    }
+
+    private fun loadMockTasks() {
+        val json = sharedPref.getString("mock_tasks", null)
+        if (!json.isNullOrEmpty()) {
+            try {
+                val type = object : TypeToken<List<Task>>() {}.type
+                val savedTasks = gson.fromJson<List<Task>>(json, type)
+                mockTasks.clear()
+                mockTasks.addAll(savedTasks)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error loading mock tasks", e)
+            }
+        }
+    }
+
+    private fun openTaskActivity(taskId: Int? = null) {
+        val intent = Intent(this, TaskActivity::class.java).apply {
+            taskId?.let { putExtra("taskId", it) }
+        }
+        taskActivityResultLauncher.launch(intent)
+    }
+
     // Обработка кнопки "Назад"
     override fun onBackPressed() {
         super.onBackPressed()
@@ -190,7 +246,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(
     supabaseHelper: SupabaseHelper,
-    onTaskClick: (Int) -> Unit
+    onTaskClick: (Int) -> Unit,
+    onAddTaskClick: () -> Unit // Добавляем новый параметр
 ) {
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -219,7 +276,8 @@ fun MainScreen(
             NavigationWithCustomMenu(
                 navController = navController,
                 supabaseHelper = supabaseHelper,
-                onTaskClick = onTaskClick
+                onTaskClick = onTaskClick,
+                onAddTaskClick = onAddTaskClick // Передаем функцию
             )
 
 
@@ -231,7 +289,8 @@ fun MainScreen(
 fun NavigationWithCustomMenu(
     navController: NavHostController,
     supabaseHelper: SupabaseHelper,
-    onTaskClick: (Int) -> Unit
+    onTaskClick: (Int) -> Unit,
+    onAddTaskClick: () -> Unit // Добавляем новый параметр
 ) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -318,7 +377,8 @@ fun NavigationWithCustomMenu(
             composable("daily") {
                 DailyScreen(
                     supabaseHelper = supabaseHelper,
-                    onTaskClick = onTaskClick
+                    onTaskClick = onTaskClick,
+                    onAddTaskClick = onAddTaskClick // Передаем функцию
                 )
             }
             composable("health_and_fitness") { HealthAndFitnessScreen(supabaseHelper) }
@@ -332,7 +392,8 @@ fun NavigationWithCustomMenu(
 @Composable
 fun DailyScreen(
     supabaseHelper: SupabaseHelper,
-    onTaskClick: (Int) -> Unit
+    onTaskClick: (Int) -> Unit,
+    onAddTaskClick: () -> Unit // Добавляем новый параметр
 ) {
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
@@ -360,7 +421,8 @@ fun DailyScreen(
                 dateStr,
                 userId,
                 supabaseHelper,
-                onTaskClick = onTaskClick
+                onTaskClick = onTaskClick,
+                onAddTaskClick = onAddTaskClick // Передаем функцию
             )
             GoalsSection(dateStr, userId, supabaseHelper)
             IdeasSection(dateStr, userId, supabaseHelper)
@@ -383,24 +445,18 @@ private fun TasksSection(
     date: String,
     userId: String,
     supabaseHelper: SupabaseHelper,
-    onTaskClick: (Int) -> Unit
+    onTaskClick: (Int) -> Unit,
+    onAddTaskClick: () -> Unit // Добавляем новый параметр
 ) {
+
     val context = LocalContext.current
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(date) {
         isLoading = true
-        error = null
-        try {
-            tasks = supabaseHelper.getDailyTasks(date, userId)
-        } catch (e: Exception) {
-            error = "Failed to load tasks: ${e.message}"
-            Log.e("TasksSection", "Error loading tasks", e)
-        } finally {
-            isLoading = false
-        }
+        tasks = TaskRepository.getDailyTasks(date, userId, supabaseHelper)
+        isLoading = false
     }
 
     Card(
@@ -438,10 +494,8 @@ private fun TasksSection(
                 }
 
                 IconButton(
-                    onClick = {
-                        val intent = Intent(context, TaskActivity::class.java)
-                        context.startActivity(intent)
-                    }
+                    onClick = onAddTaskClick // Используем переданную функцию
+
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.add_ic),
@@ -454,7 +508,6 @@ private fun TasksSection(
 
             when {
                 isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                error != null -> Text(error!!, color = MaterialTheme.colorScheme.error)
                 tasks.isEmpty() -> Text(
                     text = "Внимание! Обнаружено: 0 задач.\nРекомендуется: чай, плед, любимый сериал.\nСитуация: полный релакс.",
                     style = TextStyle(

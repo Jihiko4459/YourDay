@@ -77,7 +77,7 @@ val isDarkTheme: Boolean
     get() = GetIsDarkTheme()
 
 class RegistrationActivity : ComponentActivity() {
-    private val authHelper by lazy { SupabaseHelper() }
+    private val authHelper by lazy { SupabaseHelper(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

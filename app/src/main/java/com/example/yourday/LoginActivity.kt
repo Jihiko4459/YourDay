@@ -76,7 +76,7 @@ import kotlinx.coroutines.launch
 
 
 class LoginActivity : ComponentActivity() {
-    private val authHelper by lazy { SupabaseHelper() }
+    private val authHelper by lazy { SupabaseHelper(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

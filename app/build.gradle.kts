@@ -73,6 +73,8 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp:2.3.7") // HTTP-клиент (совместим с 2.2.1)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0") // Для сериализации
 
+    implementation("com.google.code.gson:gson:2.10.1")
+
 
 
     implementation("androidx.preference:preference-ktx:1.2.1")

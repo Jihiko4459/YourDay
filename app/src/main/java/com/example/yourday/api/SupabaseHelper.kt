@@ -1,5 +1,7 @@
 package com.example.yourday.api
 
+import android.content.Context
+import android.net.ConnectivityManager
 import co.touchlab.kermit.Logger
 import com.example.yourday.model.Article
 import com.example.yourday.model.ArticleCategory
@@ -34,24 +36,26 @@ import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.coroutines.delay
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import kotlin.random.Random
 
 
-class SupabaseHelper() {
+class SupabaseHelper(private val context: Context) {
     private val log = Logger.withTag("SupabaseAuth")
 
     internal val client: SupabaseClient by lazy {
@@ -60,13 +64,17 @@ class SupabaseHelper() {
             supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2bG56eWdpZ2pubW1zbWtycHBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4MjQ4NTksImV4cCI6MjA1ODQwMDg1OX0.c1o7HtVS701K5r_LkuykOqcANhqeOF0546MY1GuErvQ"
 
         ) {
+
             install(Auth) {
                 alwaysAutoRefresh = true // Лучше отключить автообновление
                 autoLoadFromStorage = true // Включить автосохранение
             }
             install(Postgrest) {
-                serializer = KotlinXSerializer()
-            }
+                serializer = KotlinXSerializer(json = Json {
+                    ignoreUnknownKeys = true
+                    coerceInputValues = true
+                })
+                }
         }
 
     }
@@ -122,45 +130,35 @@ class SupabaseHelper() {
 
     internal suspend fun <T> withAuth(block: suspend () -> T): Result<T> {
         return try {
-            // First try to get current session
-            var session = client.auth.currentSessionOrNull()
-
-            // If no session, try to load from storage
-            if (session == null) {
-                client.auth.loadFromStorage()
-                session = client.auth.currentSessionOrNull()
+            // 1. Проверяем соединение с интернетом
+            if (!isNetworkAvailable()) {
+                return Result.failure(Exception("No internet connection"))
             }
 
-            // If still no session, return failure
-            if (session == null) {
-                return Result.failure(Exception("User not authenticated"))
-            }
+            // 2. Получаем сессию с увеличенным таймаутом
+            val session = getCurrentSession() ?: return Result.failure(Exception("Not authenticated"))
 
-            // Check if session is expired
-            if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
-                try {
-                    // Try to refresh session
-                    client.auth.refreshCurrentSession()
-                    session = client.auth.currentSessionOrNull()
-                        ?: return Result.failure(Exception("Failed to refresh session"))
-                } catch (e: Exception) {
-                    return Result.failure(Exception("Session expired and couldn't be refreshed"))
-                }
-            }
-
-            // Now execute the operation
+            // 3. Выполняем операцию
             Result.success(block())
         } catch (e: Exception) {
             when (e) {
                 is UnauthorizedRestException -> {
                     Result.failure(Exception("Authentication required"))
                 }
+                is HttpRequestTimeoutException -> {
+                    Result.failure(Exception("Request timeout. Please try again"))
+                }
                 else -> {
-                    log.e(e) { "Error in authenticated operation" }
-                    Result.failure(e)
+                    Result.failure(Exception("Network error: ${e.message}"))
                 }
             }
         }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkInfo = connectivityManager.activeNetworkInfo
+        return networkInfo != null && networkInfo.isConnected
     }
 
 
@@ -201,25 +199,55 @@ class SupabaseHelper() {
         }
     }
 
-    suspend fun signInWithEmail(email: String, password: String): AuthResult {
-        return try {
-            // Выполняем вход
-            client.auth.signInWith(Email) {
-                this.email = email
-                this.password = password
+    suspend fun <T> withRetry(
+        maxRetries: Int = 3,
+        initialDelay: Long = 1000,
+        maxDelay: Long = 10000,
+        block: suspend () -> T
+    ): Result<T> {
+        var currentRetry = 0
+        var delay = initialDelay
+
+        while (currentRetry < maxRetries) {
+            try {
+                return Result.success(block())
+            } catch (e: Exception) {
+                currentRetry++
+                if (currentRetry == maxRetries) {
+                    return Result.failure(e)
+                }
+
+                // Экспоненциальная задержка с ограничением
+                delay = minOf(delay * 2, maxDelay)
+                delay(delay)
             }
-            // Получаем сессию
-            val session = client.auth.currentSessionOrNull()
-                ?: return AuthResult.Failure(Exception("Session not found after login"))
+        }
 
-            client.auth.sessionManager.saveSession(session)
-            // Получаем ID пользователя
-            val userId = client.auth.currentUserOrNull()?.id
-                ?: return AuthResult.Failure(Exception("User ID not found in session"))
+        return Result.failure(Exception("Max retries exceeded"))
+    }
 
-            AuthResult.Success(userId, session)
-        } catch (e: Exception) {
-            AuthResult.Failure(Exception(mapErrorToUserMessage(e)))
+    suspend fun signInWithEmail(email: String, password: String): AuthResult {
+        return withRetry {
+            try {
+                // Выполняем вход с увеличенным таймаутом
+                client.auth.signInWith(Email) {
+                    this.email = email
+                    this.password = password
+                }
+
+                val session = client.auth.currentSessionOrNull()
+                val userId = client.auth.currentUserOrNull()?.id
+
+                if (session == null || userId == null) {
+                    AuthResult.Failure(Exception("Session not found after login"))
+                } else {
+                    AuthResult.Success(userId = userId, session = session)
+                }
+            } catch (e: Exception) {
+                AuthResult.Failure(Exception(mapErrorToUserMessage(e)))
+            }
+        }.getOrElse {
+            AuthResult.Failure(Exception("Failed after retries: ${it.message}"))
         }
     }
 
@@ -543,7 +571,7 @@ class SupabaseHelper() {
         return withAuth {
             try {
                 println("Fetching article in categories from Supabase...")
-                val result = client.postgrest.from("article_in_categories")
+                val result = client.postgrest.from("articles_in_categories")
                     .select()
                     .decodeList<ArticleInCategory>()
                 println("Successfully fetched ${result.size} article-category relations")
@@ -570,6 +598,30 @@ class SupabaseHelper() {
             }
         }.getOrElse { emptyList() }
     }
+    suspend fun getArticleById(articleId: Int): Article {
+        return withAuth {
+            try {
+                println("Fetching article with ID $articleId from Supabase...")
+                val result = client.postgrest.from("articles")
+                    .select {
+                        filter {
+                            eq("id", articleId)
+                        }
+                    }
+                    .decodeList<Article>()
+
+                if (result.isEmpty()) {
+                    throw NoSuchElementException("Article with ID $articleId not found")
+                }
+
+                println("Successfully fetched article: ${result.first().title}")
+                result.first()
+            } catch (e: Exception) {
+                println("Error fetching article with ID $articleId: ${e.message}")
+                throw e
+            }
+        }.getOrThrow()
+    }
 
     // First, let's add these functions to SupabaseHelper for task operations
     suspend fun getTaskById(taskId: Int, userId: String): Task {
@@ -587,28 +639,71 @@ class SupabaseHelper() {
 
     suspend fun saveTask(task: Task): Task {
         return withAuth {
-            // Get current user ID
+            log.d { "Attempting to save task: $task" }
+
             val userId = client.auth.currentUserOrNull()?.id
-                ?: throw Exception("User not authenticated")
+                ?: throw Exception("User not authenticated").also {
+                    log.e { "User not authenticated when saving task" }
+                }
 
-            // Ensure the task belongs to this user
-            val taskToSave = task.copy(userId = userId)
+            // Ensure all date fields are properly formatted
+            val taskToSave = task.copy(
+                userId = userId,
+                createdAt = if (task.createdAt.isBlank()) getCurrentDate() else task.createdAt,
+                dueDate = if (task.dueDate.isBlank()) getCurrentDate() else task.dueDate,
+                completedAt = task.completedAt.takeIf { !it.isNullOrBlank() } ?: ""
+            )
 
-            if (task.id == 0) {
-                client.postgrest.from("tasks")
-                    .insert(taskToSave)
-                    .decodeSingle<Task>()
-            } else {
-                client.postgrest.from("tasks")
-                    .update(taskToSave) {
-                        filter {
-                            eq("id", task.id)
-                            eq("user_id", userId) // Ensure we only update user's own tasks
+            log.d { "Final task to save: $taskToSave" }
+
+            try {
+                val result = if (task.id == 0) {
+                    log.d { "Inserting new task" }
+                    client.postgrest.from("tasks")
+                        .insert(taskToSave) {
+                            select() // Return the inserted record
                         }
-                    }
-                    .decodeSingle<Task>()
+                        .decodeSingle<Task>()
+                } else {
+                    log.d { "Updating existing task ID ${task.id}" }
+                    client.postgrest.from("tasks")
+                        .update({
+                            mapOf(
+                                "title" to taskToSave.title,
+                                "description" to taskToSave.description,
+                                "due_date" to taskToSave.dueDate,
+                                "created_at" to taskToSave.createdAt,
+                                "completed_at" to taskToSave.completedAt,
+                                "is_completed" to taskToSave.isCompleted,
+                                "is_dependent" to taskToSave.isDependent,
+                                "user_id" to taskToSave.userId,
+                                "task_type_id" to taskToSave.taskTypeId,
+                                "priority_id" to taskToSave.priorityId
+                            ).filterValues { it != null }
+                        }) {
+                            filter {
+                                eq("id", task.id)
+                                eq("user_id", userId)
+                            }
+                            select() // Return the updated record
+                        }
+                        .decodeSingle<Task>()
+                }
+                log.d { "Task saved successfully: $result" }
+                result
+            } catch (e: Exception) {
+                log.e(e) { "Error saving task" }
+                throw Exception("Failed to save task: ${e.message}", e)
             }
-        }.getOrThrow()
+        }.getOrElse {
+            log.e(it) { "Failed to save task in withAuth block" }
+            throw it
+        }
+    }
+
+    // Helper function to get current date in correct format
+    private fun getCurrentDate(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
     suspend fun deleteTask(taskId: Int): Boolean {
@@ -637,19 +732,26 @@ class SupabaseHelper() {
 
     suspend fun getTaskPriorities(): List<TaskPriorityType> {
         return withAuth {
-            client.postgrest.from("task_priority_types")
+            client.postgrest.from("task_priorite_types")
                 .select()
                 .decodeList<TaskPriorityType>()
         }.getOrElse { emptyList() }
     }
 
 
-
-
-
-
-
-
+    suspend fun isAvailableTasks(): Boolean {
+        return try {
+            // Простая проверка подключения к Supabase
+            client.postgrest.from("tasks")
+                .select {
+                    limit(1)
+                }
+                .decodeList<Any>().isNotEmpty()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
 }
 
@@ -657,17 +759,29 @@ private data class FriendshipCode(val friendship_code: String)
 
 
 
-@Serializable(with = LocalDateSerializer::class)
-class LocalDateSerializer : KSerializer<LocalDate> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LocalDate", PrimitiveKind.STRING)
+object LocalDateSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("LocalDate", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: LocalDate) {
-        encoder.encodeString(value.toString())
+    override fun serialize(encoder: Encoder, value: String) {
+        try {
+            // Validate the date format
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(value)
+            encoder.encodeString(value)
+        } catch (e: Exception) {
+            // Fallback to current date if invalid
+            val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            encoder.encodeString(currentDate)
+        }
     }
 
-    override fun deserialize(decoder: Decoder): LocalDate {
-        return LocalDate.parse(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): String {
+        return try {
+            decoder.decodeString()
+        } catch (e: Exception) {
+            // Return empty string if null or invalid
+            ""
+        }
     }
 }
-
 
