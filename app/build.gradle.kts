@@ -51,12 +51,6 @@ dependencies {
     //библиотека Coil для загрузки изображений по URL
     implementation("io.coil-kt:coil-compose:2.4.0") // Последняя версия Coil
 
-    // Сама библиотека Room
-    implementation("androidx.room:room-runtime:$room_version")
-    // Дополнительно - поддержка Kotlin корутин для Room
-    implementation("androidx.room:room-ktx:$room_version")
-    kapt("androidx.room:room-compiler:2.6.1")
-
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

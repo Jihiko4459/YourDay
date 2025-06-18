@@ -66,6 +66,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.yourday.api.SupabaseHelper
+import com.example.yourday.components.ToastDuration
+import com.example.yourday.components.ToastManager
+import com.example.yourday.components.ToastType
 import com.example.yourday.data.TaskRepository
 import com.example.yourday.model.Goal
 import com.example.yourday.model.Idea
@@ -83,7 +86,14 @@ import com.example.yourday.ui.theme.White
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 
 val mockTasks=mutableListOf<Task>()
@@ -449,14 +459,22 @@ private fun TasksSection(
     onAddTaskClick: () -> Unit // Добавляем новый параметр
 ) {
 
-    val context = LocalContext.current
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
+
+    // Function to refresh tasks
+    val refreshTasks = {
+        CoroutineScope(Dispatchers.IO).launch {
+            isLoading = true
+            tasks = TaskRepository.getDailyTasks(date, userId, supabaseHelper)
+            isLoading = false
+        }
+    }
+
+    // Initial load
     LaunchedEffect(date) {
-        isLoading = true
-        tasks = TaskRepository.getDailyTasks(date, userId, supabaseHelper)
-        isLoading = false
+        refreshTasks()
     }
 
     Card(
@@ -522,7 +540,9 @@ private fun TasksSection(
                     tasks.forEach { task ->
                         TaskItem(
                             task = task,
-                            onClick = { onTaskClick(task.id) }
+                            onClick = { onTaskClick(task.id) },
+                            supabaseHelper = supabaseHelper,
+                            onTaskUpdated = { refreshTasks() }
                         )
                     }
                 }
@@ -542,18 +562,56 @@ private fun TasksSection(
 @Composable
 private fun TaskItem(
     task: Task,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    supabaseHelper: SupabaseHelper, // Add SupabaseHelper parameter
+    onTaskUpdated: () -> Unit // Callback to refresh the task list
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 2.dp)
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconToggleButton(
             checked = task.isCompleted,
-            onCheckedChange = { /* Handle completion status change */ }
+            onCheckedChange = { isChecked ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val success = supabaseHelper.updateTask(
+                            taskId = task.id,
+                            isCompleted = isChecked,
+                            completedAt = if (isChecked) getCurrentDate() else ""
+                        )
+
+                        withContext(Dispatchers.Main) {
+                            if (success) {
+                                onTaskUpdated()
+                                ToastManager.show(
+                                    if (isChecked) "Task completed!" else "Task marked incomplete",
+                                    ToastType.SUCCESS,
+                                    ToastDuration.SHORT
+                                )
+                            } else {
+                                ToastManager.show(
+                                    "Failed to update task",
+                                    ToastType.ERROR,
+                                    ToastDuration.SHORT
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            ToastManager.show(
+                                "Error: ${e.message}",
+                                ToastType.ERROR,
+                                ToastDuration.SHORT
+                            )
+                        }
+                        Log.e("TaskItem", "Error updating task", e)
+                    }
+                }
+            }
         ) {
             Image(
                 painter = painterResource(
@@ -572,13 +630,18 @@ private fun TaskItem(
                 style = TextStyle(
                     fontSize = 16.sp,
                     fontFamily = FontFamily(Font(R.font.roboto_regular)),
-                    textAlign = TextAlign.Center,
                     color = DarkBlue
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
         }
     }
+
+}
+
+// Helper function to get current date in correct format
+private fun getCurrentDate(): String {
+    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 }
 
 // 3. GoalsSection

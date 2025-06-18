@@ -386,7 +386,6 @@ class SupabaseHelper(private val context: Context) {
                     lte("created_at", date)
                     gte("due_date", date)
                     eq("user_id", userId)
-                    eq("is_completed", false)
                 }
             }
             .decodeList<Task>()
@@ -589,6 +588,41 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse {
             log.e(it) { "Failed to save task in withAuth block" }
             throw it
+        }
+    }
+
+    suspend fun updateTask(
+        taskId: Int,
+        isCompleted: Boolean? = null,
+        completedAt: String? = null,
+        title: String? = null,
+        description: String? = null
+    ): Boolean {
+        return try {
+            val updates = mutableMapOf<String, String?>()
+
+            isCompleted?.let { updates["is_completed"] = it.toString() }
+            completedAt?.let { updates["completed_at"] = it }
+            title?.let { updates["title"] = it }
+            description?.let { updates["description"] = it }
+
+            // Filter out null values
+            val nonNullUpdates = updates.filterValues { it != null }
+
+            if (nonNullUpdates.isNotEmpty()) {
+                client.from("tasks")
+                    .update(nonNullUpdates) {
+                        filter {
+                            eq("id", taskId)
+                        }
+                    }
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            log.e(e) { "Error updating task with ID $taskId" }
+            false
         }
     }
 
