@@ -1,5 +1,8 @@
 package com.example.yourday.screens
 
+import android.app.Activity
+import android.content.Context.MODE_PRIVATE
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +39,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.yourday.R
+import com.example.yourday.RegistrationActivity
 import com.example.yourday.api.SupabaseHelper
+import com.example.yourday.components.ToastDuration
+import com.example.yourday.components.ToastManager
+import com.example.yourday.components.ToastType
 import com.example.yourday.model.ProfileData
 import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Primary
@@ -46,6 +53,7 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ProfileScreen(
@@ -149,35 +157,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Friends section
             item {
-                ProfileOptionItem(text = "Друзья", onClick = {
-                    // Handle click
-                })
-                ProfileOptionItem(text = "Мой код дружбы", onClick = {
-                    // Handle click
-                })
-                ProfileOptionItem(text = "Аналитика", onClick = {
-                    // Handle click
-                })
-                ProfileOptionItem(text = "Изменить пароль", onClick = {
-                    // Handle click
-                })
-                ProfileOptionItem(text = "Показывать уведомления", onClick = {
-                    // Handle click
-                })
-                ProfileOptionItem(text = "Оформление", onClick = {
-                    // Handle click
-                })
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Important things section
-            item {
-                ProfileOptionItem(text = "Список важных вещей", onClick = {
-                    // Handle click
-                })
                 ProfileOptionItem(text = "Хобби", onClick = {
                     // Handle click
                 })
@@ -187,27 +167,44 @@ fun ProfileScreen(
                 ProfileOptionItem(text = "Лекарства", onClick = {
                     // Handle click
                 })
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Support and logout section
-            item {
-                ProfileOptionItem(text = "Поддержка и обратная связь", onClick = {
-                    // Handle click
-                })
                 ProfileOptionItem(
                     text = "Выйти",
                     onClick = {
                         CoroutineScope(Dispatchers.IO).launch {
                             try {
                                 supabaseHelper.client.auth.signOut()
-                                // Navigate back to login screen on main thread
-                                navController.navigate("login") {
-                                    popUpTo(0)
+
+                                // Clear all local data
+                                val sharedPref = context.getSharedPreferences("authorization", MODE_PRIVATE)
+                                sharedPref.edit().clear().apply()
+
+                                // Clear any other shared preferences if needed
+                                context.getSharedPreferences("YourDayPrefs", MODE_PRIVATE)
+                                    .edit()
+                                    .clear()
+                                    .apply()
+
+                                // Создаем Intent для перехода на RegistrationActivity
+                                val intent = Intent(context, RegistrationActivity::class.java).apply {
+                                    // Очищаем весь стек активностей
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                                 }
+
+                                // Запускаем новую активность
+                                context.startActivity(intent)
+
+                                // Если используете Compose Activity, можно закрыть текущую
+                                (context as? Activity)?.finish()
+
                             } catch (e: Exception) {
                                 // Handle logout error
+                                withContext(Dispatchers.Main) {
+                                    ToastManager.show(
+                                        "Ошибка при выходе: ${e.message}",
+                                        ToastType.ERROR,
+                                        ToastDuration.SHORT
+                                    )
+                                }
                             }
                         }
                     }

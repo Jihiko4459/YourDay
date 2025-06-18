@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +46,9 @@ import com.example.yourday.components.ToastDuration
 import com.example.yourday.components.ToastManager
 import com.example.yourday.components.ToastType
 import com.example.yourday.data.ArticleData
+import com.example.yourday.data.MockArticleInCategoryRepository
+import com.example.yourday.data.MockArticleRepository
+import com.example.yourday.data.MockCategoryRepository
 import com.example.yourday.model.Article
 import com.example.yourday.model.ArticleCategory
 import com.example.yourday.ui.theme.DarkBlue
@@ -74,59 +78,133 @@ fun ArticlesScreen(
                 type = ToastType.INFO,
                 duration = ToastDuration.LONG
             )
+            // Immediately load mock data when error occurs
+            ArticleData.articles = MockArticleRepository.getAllArticles()
+            ArticleData.categories = MockCategoryRepository.getAllCategories()
+            ArticleData.articleInCategories = MockArticleInCategoryRepository.getAllRelations()
         }
         isLoading = false
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp, bottom = 22.dp),
-                verticalAlignment = Alignment.CenterVertically
+        when {
+            isLoading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }isError || ArticleData.articles.isEmpty() -> {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "Статьи",
-                    modifier = Modifier.fillMaxWidth(),
-                    style = TextStyle(
-                        fontSize = 24.sp,
-                        fontFamily = FontFamily(Font(R.font.roboto_semibold)),
-                        color = Primary
-                    ),
-                    textAlign = TextAlign.Center
-                )
+                Text("Используются локальные данные")
+                // No retry button needed since we're using mock data
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 22.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                CategoryChip(
-                    text = "Все категории",
-                    isSelected = selectedCategory == null,
-                    onClick = { selectedCategory = null }
-                )
-
-                ArticleData.categories.forEach { category ->
-                    CategoryChip(
-                        text = category.categoryName,
-                        isSelected = selectedCategory?.id == category.id,
-                        onClick = { selectedCategory = category }
+            // Show content with mock data
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp, bottom = 22.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Статьи",
+                        modifier = Modifier.fillMaxWidth(),
+                        style = TextStyle(
+                            fontSize = 24.sp,
+                            fontFamily = FontFamily(Font(R.font.roboto_semibold)),
+                            color = Primary
+                        ),
+                        textAlign = TextAlign.Center
                     )
                 }
-            }
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(ArticleData.getArticlesByCategory(selectedCategory?.id)) { article ->
-                    ArticleCard(
-                        article = article,
-                        categories = ArticleData.getCategoriesForArticle(article.id),
-                        onClick = { onIntentToDetails(article.id) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 22.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    CategoryChip(
+                        text = "Все категории",
+                        isSelected = selectedCategory == null,
+                        onClick = { selectedCategory = null }
                     )
+
+                    ArticleData.categories.forEach { category ->
+                        CategoryChip(
+                            text = category.categoryName,
+                            isSelected = selectedCategory?.id == category.id,
+                            onClick = { selectedCategory = category }
+                        )
+                    }
+                }
+
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(ArticleData.getArticlesByCategory(selectedCategory?.id)) { article ->
+                        ArticleCard(
+                            article = article,
+                            categories = ArticleData.getCategoriesForArticle(article.id),
+                            onClick = { onIntentToDetails(article.id) }
+                        )
+                    }
+                }
+            }
+        }
+            else -> {
+                // Normal content when data loaded successfully
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp, bottom = 22.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Статьи",
+                            modifier = Modifier.fillMaxWidth(),
+                            style = TextStyle(
+                                fontSize = 24.sp,
+                                fontFamily = FontFamily(Font(R.font.roboto_semibold)),
+                                color = Primary
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 22.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        CategoryChip(
+                            text = "Все категории",
+                            isSelected = selectedCategory == null,
+                            onClick = { selectedCategory = null }
+                        )
+
+                        ArticleData.categories.forEach { category ->
+                            CategoryChip(
+                                text = category.categoryName,
+                                isSelected = selectedCategory?.id == category.id,
+                                onClick = { selectedCategory = category }
+                            )
+                        }
+                    }
+
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(ArticleData.getArticlesByCategory(selectedCategory?.id)) { article ->
+                            ArticleCard(
+                                article = article,
+                                categories = ArticleData.getCategoriesForArticle(article.id),
+                                onClick = { onIntentToDetails(article.id) }
+                            )
+                        }
+                    }
                 }
             }
         }

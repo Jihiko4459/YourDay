@@ -97,13 +97,6 @@ import java.util.Locale
 
 
 val mockTasks=mutableListOf<Task>()
-val mockGoals=mutableListOf<Goal>()
-val mockIdeas=mutableListOf<Idea>()
-
-
-val mockSteps=mutableListOf<Steps>()
-val mockUA=mutableListOf<UserActivity>()
-
 
 
 
@@ -117,11 +110,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Load mock tasks from SharedPreferences
+        // Загрузка моковых задач из SharedPreferences
         loadMockTasks()
 
         setContent {
             YourDayTheme {
+                // Настройка системного UI (статус-бара и навигационной панели)
                 val systemUiController = rememberSystemUiController()
                 val darkTheme = isSystemInDarkTheme()
 
@@ -151,7 +145,7 @@ class MainActivity : ComponentActivity() {
                         ) {
 
                         val context=LocalContext.current
-                        // Основной контент
+                        // Основной контент приложения
                         NavHost(
                             navController = navController,
                             startDestination = "main",
@@ -215,7 +209,7 @@ class MainActivity : ComponentActivity() {
     }
 
 
-
+    // Обработчик результата из TaskActivity
     private val taskActivityResultLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -225,8 +219,14 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun reloadDailyScreen() {
-        // Здесь можно обновить данные или просто перезагрузить экран
-        // Например, можно использовать флаг для принудительного обновления
+        recreate()
+    }
+    // Вспомогательная функция для поиска NavController
+    private fun findNavController(): NavHostController {
+        // Здесь нужно реализовать поиск NavController в вашей иерархии View
+        // Это может потребовать рефакторинга, чтобы получить доступ к NavController из Activity
+        // Альтернативный вариант - передавать NavController в функцию reloadDailyScreen()
+        throw NotImplementedError("Implement findNavController() to locate your NavHostController")
     }
 
     private fun loadMockTasks() {
@@ -243,13 +243,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openTaskActivity(taskId: Int? = null) {
-        val intent = Intent(this, TaskActivity::class.java).apply {
-            taskId?.let { putExtra("taskId", it) }
-        }
-        taskActivityResultLauncher.launch(intent)
-    }
-
     // Обработка кнопки "Назад"
     override fun onBackPressed() {
         super.onBackPressed()
@@ -262,7 +255,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     supabaseHelper: SupabaseHelper,
     onTaskClick: (Int) -> Unit,
-    onAddTaskClick: () -> Unit // Добавляем новый параметр
+    onAddTaskClick: () -> Unit
 ) {
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -284,10 +277,9 @@ fun MainScreen(
 
                 )
 
-            // Создаем NavController
             val navController = rememberNavController()
 
-            // Вызываем наш компонент с навигацией
+            // Компонент с кастомным меню навигации
             NavigationWithCustomMenu(
                 navController = navController,
                 supabaseHelper = supabaseHelper,
@@ -415,7 +407,13 @@ fun DailyScreen(
     val userId = getUserId(context)
     val dateStr = convertMillisToDateString(selectedDate)
 
-    var refreshTrigger by remember { mutableStateOf(0) }
+    var reloadTrigger by remember { mutableStateOf(0) }
+
+    // Function to trigger reload
+    fun reloadDailyScreen() {
+        reloadTrigger++
+    }
+
 
     Column(
         modifier = Modifier
@@ -426,7 +424,7 @@ fun DailyScreen(
         CustomDatePicker(
             onDateSelected = { millis ->
                 selectedDate = millis
-                refreshTrigger++ // Trigger refresh when date changes
+                reloadDailyScreen() // Trigger reload when date changes
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -437,22 +435,27 @@ fun DailyScreen(
             modifier = Modifier.padding(top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Секция задач
             TasksSection(
                 dateStr,
                 userId,
                 supabaseHelper,
                 onTaskClick = onTaskClick,
                 onAddTaskClick = onAddTaskClick,
-                refreshTrigger = refreshTrigger // Pass the refresh trigger
+                reloadTrigger = reloadTrigger // Pass the trigger as a parameter
             )
-            GoalsSection(dateStr, userId, supabaseHelper, refreshTrigger)
-            IdeasSection(dateStr, userId, supabaseHelper, refreshTrigger)
+
+            // Секция целей
+            GoalsSection(dateStr, userId, supabaseHelper)
+
+            // Секция идей
+            IdeasSection(dateStr, userId, supabaseHelper)
         }
     }
 }
 
 
-// Вспомогательная функция
+// Вспомогательная функция для конвертации времени в строку даты
 private fun convertMillisToDateString(millis: Long): String {
     val calendar = Calendar.getInstance().apply { timeInMillis = millis }
     val year = calendar.get(Calendar.YEAR)
@@ -468,24 +471,29 @@ private fun TasksSection(
     supabaseHelper: SupabaseHelper,
     onTaskClick: (Int) -> Unit,
     onAddTaskClick: () -> Unit,
-    refreshTrigger: Int // Add refresh trigger parameter
+    reloadTrigger: Int // Add reloadTrigger parameter
 ) {
 
     var tasks by remember { mutableStateOf<List<Task>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
 
-    // Function to refresh tasks
-    val refreshTasks = {
+    // Функция для обновления задач
+    fun refreshTasks() {
         CoroutineScope(Dispatchers.IO).launch {
             isLoading = true
-            tasks = TaskRepository.getDailyTasks(date, userId, supabaseHelper)
-            isLoading = false
+            try {
+                tasks = TaskRepository.getDailyTasks(date, userId, supabaseHelper)
+            } catch (e: Exception) {
+                Log.e("TasksSection", "Error loading tasks", e)
+            } finally {
+                isLoading = false
+            }
         }
     }
 
-    // Initial load
-    LaunchedEffect(date, refreshTrigger) {
+    // Первоначальная загрузка и обновление при изменении даты или триггера
+    LaunchedEffect(date, reloadTrigger) {
         refreshTasks()
     }
 
@@ -661,7 +669,7 @@ private fun TaskItem(
 
 }
 
-// Helper function to get current date in correct format
+// Вспомогательная функция для форматирования даты
 private fun getCurrentDate(): String {
     return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 }
@@ -673,7 +681,7 @@ private fun formatDate(dateString: String): String {
         val date = inputFormat.parse(dateString)
         outputFormat.format(date)
     } catch (e: Exception) {
-        dateString // Return original if parsing fails
+        dateString /// Возвращаем оригинальную строку, если парсинг не удался
     }
 }
 
@@ -683,13 +691,12 @@ private fun GoalsSection(
     date: String,
     userId: String,
     supabaseHelper: SupabaseHelper,
-    refreshTrigger: Int // Add refresh trigger
 ) {
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(date, refreshTrigger) {
+    LaunchedEffect(date) {
         isLoading = true
         error = null
         try {
@@ -826,14 +833,13 @@ private fun IdeasSection(
     date: String,
     userId: String,
     supabaseHelper: SupabaseHelper,
-    refreshTrigger: Int // Add refresh trigger
 ) {
 
     var ideas by remember { mutableStateOf<List<Idea>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(date, refreshTrigger) {
+    LaunchedEffect(date) {
         isLoading = true
         error = null
         try {
