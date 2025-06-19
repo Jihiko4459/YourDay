@@ -790,7 +790,7 @@ private fun GoalItem(goalProgress: Goal) {
         ) {
             // Пустой элемент для балансировки (занимает такое же пространство слева, как иконка справа)
             Icon(
-                painter = painterResource(id = R.drawable.notific),
+                painter = painterResource(id = R.drawable.correct_ic),
                 contentDescription = "Уведомления",
                 modifier = Modifier.size(24.dp),
                 tint = Primary
