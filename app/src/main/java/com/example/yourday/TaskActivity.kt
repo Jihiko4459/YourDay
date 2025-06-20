@@ -76,7 +76,6 @@ import com.example.yourday.ui.theme.White
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -188,26 +187,18 @@ fun TaskDetailScreen(
         )
     }
 
-    // Dropdown states
-    var taskTypes by remember { mutableStateOf<List<TaskType>>(emptyList()) }
-    var priorities by remember { mutableStateOf<List<TaskPriorityType>>(emptyList()) }
+    val taskTypes = remember { TaskRepository.mockTaskTypes }
+    val priorities = remember { TaskRepository.mockPriorities }
 
     LaunchedEffect(taskId) {
         isLoading = true
-        try {
-            // Параллельно загружаем типы задач и приоритеты
-            val typesDeferred = async { TaskRepository.getTaskTypes(supabaseHelper) }
-            val prioritiesDeferred = async { TaskRepository.getTaskPriorities(supabaseHelper) }
 
-            taskTypes = typesDeferred.await()
-            priorities = prioritiesDeferred.await()
-
-            // Для новой задачи устанавливаем первые значения по умолчанию
-            if (taskId == null) {
-                selectedTaskType = taskTypes.firstOrNull()
-                selectedPriority = priorities.firstOrNull()
-            } else {
-                // Загружаем задачу только после загрузки типов и приоритетов
+        if (taskId == null) {
+            selectedTaskType = taskTypes.firstOrNull()
+            selectedPriority = priorities.firstOrNull()
+            isLoading = false
+        } else {
+            try {
                 task = TaskRepository.getTaskById(taskId, userId, supabaseHelper)
                 task?.let {
                     title = it.title ?: ""
@@ -218,11 +209,11 @@ fun TaskDetailScreen(
                     selectedTaskType = taskTypes.find { type -> type.id == it.taskTypeId }
                     selectedPriority = priorities.find { priority -> priority.id == it.priorityId }
                 }
+            } catch (e: Exception) {
+                error = "Ошибка при загрузке данных: ${e.message}"
+            } finally {
+                isLoading = false
             }
-        } catch (e: Exception) {
-            error = "Ошибка при загрузке данных: ${e.message}"
-        } finally {
-            isLoading = false
         }
     }
 
