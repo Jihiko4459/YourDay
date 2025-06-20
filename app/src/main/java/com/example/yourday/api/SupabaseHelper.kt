@@ -33,6 +33,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -470,8 +471,7 @@ class SupabaseHelper(private val context: Context) {
             client.postgrest.from("tasks")
                 .select {
                     filter {
-                        lte("created_at", date)
-                        gte("due_date", date)
+                        eq("due_date", date)
                         eq("user_id", userId)
                     }
                 }
@@ -750,22 +750,27 @@ class SupabaseHelper(private val context: Context) {
         description: String? = null
     ): Boolean {
         return try {
-            val updates = mutableMapOf<String, Any?>()
+            // Create a data class for the updates
+            @Serializable
+            data class TaskUpdate(
+                val is_completed: Boolean? = null,
+                val completed_at: String? = null,
+                val title: String? = null,
+                val description: String? = null
+            )
 
-            isCompleted?.let { updates["is_completed"] = it }
-            completedAt?.let {
-                if (it.isEmpty()) {
-                    updates["completed_at"] = null
-                } else {
-                    updates["completed_at"] = it
-                }
-            }
-            title?.let { updates["title"] = it }
-            description?.let { updates["description"] = it }
+            // Create the update object
+            val updates = TaskUpdate(
+                is_completed = isCompleted,
+                completed_at = if (isCompleted == false) null else completedAt,
+                title = title,
+                description = description
+            )
+
 
             // Execute the update
             client.from("tasks")
-                .update(updates.filterValues { it != null }) {
+                .update(updates) {
                     filter {
                         eq("id", taskId)
                     }

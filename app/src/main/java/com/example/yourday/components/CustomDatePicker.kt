@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -48,7 +47,7 @@ fun CustomDatePicker(
     modifier: Modifier = Modifier
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
-    val currentDate = remember {  Instant.now().toEpochMilli() }
+    val currentDate = remember { Instant.now().toEpochMilli() }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = currentDate
     )

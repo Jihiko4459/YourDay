@@ -591,28 +591,31 @@ private fun TaskItem(
             .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        var isUpdating by remember { mutableStateOf(false) }
+
         IconToggleButton(
             checked = task.isCompleted,
             onCheckedChange = { isChecked ->
+                isUpdating = true
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         val success = supabaseHelper.updateTask(
                             taskId = task.id,
                             isCompleted = isChecked,
-                            completedAt = if (isChecked) getCurrentDate() else ""
+                            completedAt = if (isChecked) getCurrentDate() else null // Set to null when unchecking
                         )
 
                         withContext(Dispatchers.Main) {
                             if (success) {
                                 onTaskUpdated() // This will trigger the refresh
                                 ToastManager.show(
-                                    if (isChecked) "Task completed!" else "Task marked incomplete",
+                                    if (isChecked) "Задача выполнена!" else "Задача отмечена как невыполненная",
                                     ToastType.SUCCESS,
                                     ToastDuration.SHORT
                                 )
                             } else {
                                 ToastManager.show(
-                                    "Failed to update task",
+                                    "Не удалось обновить задачу",
                                     ToastType.ERROR,
                                     ToastDuration.SHORT
                                 )
@@ -621,12 +624,14 @@ private fun TaskItem(
                     } catch (e: Exception) {
                         withContext(Dispatchers.Main) {
                             ToastManager.show(
-                                "Error: ${e.message}",
+                                "Ошибка: ${e.message ?: "Неизвестная ошибка"}",
                                 ToastType.ERROR,
                                 ToastDuration.SHORT
                             )
                         }
                         Log.e("TaskItem", "Error updating task", e)
+                    }finally {
+                        isUpdating = false
                     }
                 }
             }
@@ -636,7 +641,7 @@ private fun TaskItem(
                     if (task.isCompleted) R.drawable.check2
                     else R.drawable.check1
                 ),
-                contentDescription = if (task.isCompleted) "Checked" else "Unchecked",
+                contentDescription = if (task.isCompleted) "Выполнено" else "Не выполнено",
                 modifier = Modifier.size(24.dp),
                 colorFilter = null
             )
