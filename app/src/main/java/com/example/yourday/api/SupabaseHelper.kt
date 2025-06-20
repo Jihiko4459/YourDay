@@ -84,29 +84,29 @@ class SupabaseHelper(private val context: Context) {
      */
     suspend fun getCurrentSession(): UserSession? {
         return try {
-            // Получение текущей сессии (или null)
-            var session = client.auth.currentSessionOrNull() ?: return null
-
-            // Проверка истечения срока действия сессии
-            if (Instant.parse(session.expiresAt.toString()) < Clock.System.now()) {
-                try {
-                    // Обновляем сессию (это сохраняет её внутри клиента)
-                    client.auth.refreshCurrentSession() // ⚠️ Возвращает Unit
-
-                    // Получаем обновлённую сессию
-                    session = client.auth.currentSessionOrNull() ?: return null
-
-                    // Явно сохраняем (если нужно)
-                    client.auth.sessionManager.saveSession(session)
-                } catch (e: Exception) {
-                    log.e(e) { "Failed to refresh session" }
-                    // Пробуем загрузить из хранилища
+            // First try to load from storage if no session exists
+            var session = client.auth.currentSessionOrNull()
+                ?: run {
                     client.auth.loadFromStorage()
-                    session = client.auth.currentSessionOrNull() ?: return null
+                    client.auth.currentSessionOrNull()
+                }
+
+            // Check if session exists and is valid
+            session?.let {
+                if (Instant.parse(it.expiresAt.toString()) < Clock.System.now()) {
+                    try {
+                        client.auth.refreshCurrentSession()
+                        session = client.auth.currentSessionOrNull()
+                    } catch (e: Exception) {
+                        log.e(e) { "Failed to refresh session" }
+                        // Try loading from storage again if refresh fails
+                        client.auth.loadFromStorage()
+                        session = client.auth.currentSessionOrNull()
+                    }
                 }
             }
 
-            session // Возвращаем актуальную сессию (или null)
+            session
         } catch (e: Exception) {
             log.e(e) { "Error in getCurrentSession()" }
             null
@@ -142,17 +142,24 @@ class SupabaseHelper(private val context: Context) {
      */
     internal suspend fun <T> withAuth(block: suspend () -> T): Result<T> {
         return try {
-            // 1. Проверяем соединение с интернетом
+            log.d { "Checking authentication state..." }
+
             if (!isNetworkAvailable()) {
+                log.d { "No internet connection" }
                 return Result.failure(Exception("No internet connection"))
             }
 
-            // 2. Получаем сессию с увеличенным таймаутом
-            val session = getCurrentSession() ?: return Result.failure(Exception("Not authenticated"))
+            val session = getCurrentSession().also {
+                log.d { "Current session: ${it?.accessToken?.take(5)}... (expires: ${it?.expiresAt})" }
+            } ?: run {
+                log.d { "No active session found" }
+                return Result.failure(Exception("Not authenticated"))
+            }
 
-            // 3. Выполняем операцию
+            log.d { "User authenticated, proceeding with operation" }
             Result.success(block())
         } catch (e: Exception) {
+            log.e(e) { "Authentication error in withAuth block" }
             when (e) {
                 is UnauthorizedRestException -> {
                     Result.failure(Exception("Authentication required"))
