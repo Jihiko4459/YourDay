@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -66,7 +65,6 @@ import com.example.yourday.api.SupabaseHelper.AuthResult
 import com.example.yourday.components.GlobalToast
 import com.example.yourday.components.ToastManager
 import com.example.yourday.components.ToastType
-import com.example.yourday.ui.theme.Black
 import com.example.yourday.ui.theme.DarkBlue
 import com.example.yourday.ui.theme.Gray1
 import com.example.yourday.ui.theme.Primary
@@ -297,7 +295,7 @@ fun LoginScreen(
                         painter = painterResource(id = R.drawable.image),
                         contentDescription = "App Logo",
                         modifier = Modifier
-                            .width(250.dp)
+                            .fillMaxWidth(0.7f)
                             .aspectRatio(1f / 1f),
                         contentScale = ContentScale.Fit,
                     )
@@ -476,7 +474,7 @@ fun LoginScreen(
                             lineHeight = 16.9.sp,
                             fontFamily = FontFamily(Font(R.font.roboto_bold)),
                             textAlign = TextAlign.Center,
-                            color = if (isDarkTheme) White else Black
+                            color =  White
                         )
                     )
                 }
