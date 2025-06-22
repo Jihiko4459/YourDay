@@ -41,8 +41,6 @@ android {
         compose = true
     }
 }
-// Room - база данных на телефоне (как Excel, но для приложений)
-val room_version = "2.6.1" // всегда бери последнюю стабильную версию
 
 
 dependencies {

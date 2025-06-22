@@ -523,6 +523,94 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { emptyList() }
     }
 
+    suspend fun insertIdea(idea: Idea): Boolean {
+        return withAuth {
+            try {
+                // For new ideas, we shouldn't specify the ID
+                val ideaToInsert = if (idea.id == 0) {
+                    idea.copy(id = null) // Remove the ID for new inserts
+                } else {
+                    idea
+                }
+
+                client.postgrest.from("ideas")
+                    .insert(ideaToInsert)
+                true
+            } catch (e: Exception) {
+                Logger.e(e) { "Error inserting idea" }
+                false
+            }
+        }.getOrElse { false }
+    }
+
+    suspend fun updateIdea(idea: Idea): Boolean {
+        if (idea.id == null || idea.userId == null) {
+            return false
+        }
+
+        return withAuth {
+            try {
+                client.postgrest.from("ideas")
+                    .update({
+                        set("title", idea.title)
+                        set("description", idea.description)
+                    }) {
+                        filter {
+                            eq("id", idea.id)
+                            eq("user_id", idea.userId)
+                        }
+                    }
+                true
+            } catch (e: Exception) {
+                Logger.e(e) { "Error updating idea" }
+                false
+            }
+        }.getOrElse { false }
+    }
+
+    suspend fun getIdeaById(ideaId: Int, userId: String): Idea? {
+        return try {
+            client.postgrest.from("ideas")
+                .select {
+                    filter {
+                        eq("id", ideaId)
+                        eq("user_id", userId)
+                    }
+                }
+                .decodeSingle<Idea>()
+        } catch (e: Exception) {
+            Logger.e(e) { "Error getting idea by ID $ideaId" }
+            null
+        }
+    }
+
+    /**
+     * Удаляет идею по ID.
+     * @param ideaId ID идеи.
+     * @return true, если идея удалена успешно, иначе false.
+     * @throws Exception Если пользователь не аутентифицирован.
+     */
+    suspend fun deleteIdea(ideaId: Int): Boolean {
+        return withAuth {
+            val userId = client.auth.currentUserOrNull()?.id
+                ?: throw Exception("User not authenticated")
+
+            try {
+                client.postgrest.from("ideas")
+                    .delete {
+                        filter {
+                            eq("id", ideaId)
+                            eq("user_id", userId)
+                        }
+                    }
+                true
+            } catch (e: Exception) {
+                Logger.e(e) { "Error deleting idea with ID $ideaId" }
+                false
+            }
+        }.getOrElse { false }
+    }
+
     /**
      * Получает данные о шагах на указанную дату.
      * @param date Дата в формате строки.

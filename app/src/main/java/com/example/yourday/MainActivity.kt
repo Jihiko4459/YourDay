@@ -163,6 +163,16 @@ class MainActivity : ComponentActivity() {
                                     onAddTaskClick = {
                                         val intent = Intent(context, TaskActivity::class.java)
                                         taskActivityResultLauncher.launch(intent)
+                                    },
+                                    onIdeaClick = { ideaId ->
+                                        val intent = Intent(context, IdeaActivity::class.java).apply {
+                                            putExtra("ideaId", ideaId)
+                                        }
+                                        ideaActivityResultLauncher.launch(intent)
+                                    },
+                                    onAddIdeaClick = {
+                                        val intent = Intent(context, IdeaActivity::class.java)
+                                        ideaActivityResultLauncher.launch(intent)
                                     }
                                 )
                             }
@@ -194,6 +204,16 @@ class MainActivity : ComponentActivity() {
                                     onAddTaskClick = {
                                         val intent = Intent(context, TaskActivity::class.java)
                                         taskActivityResultLauncher.launch(intent)
+                                    },
+                                    onIdeaClick = { ideaId ->
+                                        val intent = Intent(context, TaskActivity::class.java).apply {
+                                            putExtra("ideaId", ideaId)
+                                        }
+                                        ideaActivityResultLauncher.launch(intent)
+                                    },
+                                    onAddIdeaClick = {
+                                        val intent = Intent(context, TaskActivity::class.java)
+                                        ideaActivityResultLauncher.launch(intent)
                                     }
                                 )
                             }
@@ -208,6 +228,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Обработчик результата из IdeaActivity
+    private val ideaActivityResultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            reloadDailyScreen()
+        }
+    }
 
     // Обработчик результата из TaskActivity
     private val taskActivityResultLauncher = registerForActivityResult(
@@ -249,7 +277,9 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     supabaseHelper: SupabaseHelper,
     onTaskClick: (Int) -> Unit,
-    onAddTaskClick: () -> Unit
+    onAddTaskClick: () -> Unit,
+    onIdeaClick: (Int?) -> Unit,
+    onAddIdeaClick: () -> Unit
 ) {
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -278,7 +308,9 @@ fun MainScreen(
                 navController = navController,
                 supabaseHelper = supabaseHelper,
                 onTaskClick = onTaskClick,
-                onAddTaskClick = onAddTaskClick // Передаем функцию
+                onAddTaskClick = onAddTaskClick,
+                onIdeaClick = onIdeaClick,
+                onAddIdeaClick = onAddIdeaClick
             )
 
 
@@ -293,9 +325,12 @@ fun NavigationWithCustomMenu(
     navController: NavHostController,
     supabaseHelper: SupabaseHelper,
     onTaskClick: (Int) -> Unit,
-    onAddTaskClick: () -> Unit // Добавляем новый параметр
+    onAddTaskClick: () -> Unit,
+    onIdeaClick:(Int?)-> Unit,
+    onAddIdeaClick:()->Unit
 ) {
 
+    val context=LocalContext.current
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -381,7 +416,9 @@ fun NavigationWithCustomMenu(
                 DailyScreen(
                     supabaseHelper = supabaseHelper,
                     onTaskClick = onTaskClick,
-                    onAddTaskClick = onAddTaskClick // Передаем функцию
+                    onAddTaskClick = onAddTaskClick,
+                    onIdeaClick = onIdeaClick,
+                    onAddIdeaClick = onAddIdeaClick
                 )
             }
             composable("health_and_fitness") { HealthAndFitnessScreen(supabaseHelper) }
@@ -396,7 +433,9 @@ fun NavigationWithCustomMenu(
 fun DailyScreen(
     supabaseHelper: SupabaseHelper,
     onTaskClick: (Int) -> Unit,
-    onAddTaskClick: () -> Unit // Добавляем новый параметр
+    onAddTaskClick: () -> Unit,
+    onIdeaClick: (Int?) -> Unit,
+    onAddIdeaClick: () -> Unit
 ) {
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
     val context = LocalContext.current
@@ -446,7 +485,14 @@ fun DailyScreen(
             GoalsSection(dateStr, userId, supabaseHelper)
 
             // Секция идей
-            IdeasSection(dateStr, userId, supabaseHelper)
+            IdeasSection(
+                dateStr,
+                userId,
+                supabaseHelper,
+                onIdeaClick = onIdeaClick,
+                onAddIdeaClick = onAddIdeaClick,
+                reloadTrigger = reloadTrigger
+            )
         }
     }
 }
@@ -836,23 +882,31 @@ private fun IdeasSection(
     date: String,
     userId: String,
     supabaseHelper: SupabaseHelper,
+    onIdeaClick: (Int?) -> Unit,
+    onAddIdeaClick: () -> Unit,
+    reloadTrigger: Int = 0
 ) {
 
     var ideas by remember { mutableStateOf<List<Idea>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(date) {
-        isLoading = true
-        error = null
-        try {
-            ideas = supabaseHelper.getDailyIdeas(date, userId)
-        } catch (e: Exception) {
-            error = "Failed to load ideas: ${e.message}"
-            Log.e("IdeasSection", "Error loading ideas", e)
-        } finally {
-            isLoading = false
+    fun refreshIdeas() {
+        CoroutineScope(Dispatchers.IO).launch {
+            isLoading = true
+            try {
+                ideas = supabaseHelper.getDailyIdeas(date, userId)
+            } catch (e: Exception) {
+                error = "Failed to load ideas: ${e.message}"
+                Log.e("IdeasSection", "Error loading ideas", e)
+            } finally {
+                isLoading = false
+            }
         }
+    }
+
+    LaunchedEffect(date, reloadTrigger) {
+        refreshIdeas()
     }
 
     Card(
@@ -893,7 +947,8 @@ private fun IdeasSection(
                 }
 
                 IconButton(
-                    onClick = {  }) {
+                    onClick = onAddIdeaClick // Use the passed parameter
+                ) {
                     Icon(
                         painter = painterResource(id = R.drawable.add_ic),
                         contentDescription = "Добавить идею",
@@ -917,7 +972,12 @@ private fun IdeasSection(
                     modifier = Modifier.fillMaxWidth().padding(top=6.dp)
                 )
                 else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ideas.forEach { idea -> IdeaItem(idea) }
+                    ideas.forEach { idea ->
+                        IdeaItem(
+                            idea = idea,
+                            onClick = { onIdeaClick(idea.id) }
+                        )
+                    }
                 }
             }
             Spacer(
@@ -930,18 +990,26 @@ private fun IdeasSection(
 }
 //Элемент идеи
 @Composable
-private fun IdeaItem(idea: Idea) {
-    Row(modifier = Modifier.padding(vertical = 4.dp)) {
+private fun IdeaItem(
+    idea: Idea,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+    ) {
         Text(text = "–", modifier = Modifier.padding(start = 3.dp, end = 8.dp))
         Text(
             text = idea.title,
             style = TextStyle(
                 fontSize = 16.sp,
                 fontFamily = FontFamily(Font(R.font.roboto_regular)),
-                textAlign = TextAlign.Center,
                 color = DarkBlue
             )
         )
+
     }
 }
 

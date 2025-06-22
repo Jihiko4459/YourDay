@@ -9,4 +9,5 @@
     <string name="title_activity_article_detail">ArticleDetailActivity</string>
     <string name="title_activity_tasks">TasksActivity</string>
     <string name="title_activity_task">TaskActivity</string>
+    <string name="title_activity_idea">IdeaActivity</string>
 </resources>

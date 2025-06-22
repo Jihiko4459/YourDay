@@ -255,7 +255,7 @@ data class Hobby(
 // Модель идеи
 @Serializable
 data class Idea(
-    @SerialName("id") val id: Int,                     // ID идеи
+    @SerialName("id") val id: Int? = null,                   // ID идеи
     @SerialName("user_id") val userId: String,         // ID пользователя
     @SerialName("date") val date: String,              // Дата идеи
     @SerialName("title") val title: String,            // Заголовок
