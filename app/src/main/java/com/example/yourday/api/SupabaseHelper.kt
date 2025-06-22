@@ -522,13 +522,16 @@ class SupabaseHelper(private val context: Context) {
             .decodeList<Idea>()
         }.getOrElse { emptyList() }
     }
-
+    /**
+     * Добавляет новую идею или обновляет существующую.
+     * @param idea Объект идеи для сохранения.
+     * @return true, если операция выполнена успешно, иначе false.
+     */
     suspend fun insertIdea(idea: Idea): Boolean {
         return withAuth {
             try {
-                // For new ideas, we shouldn't specify the ID
                 val ideaToInsert = if (idea.id == 0) {
-                    idea.copy(id = null) // Remove the ID for new inserts
+                    idea.copy(id = null) // Удаляем ID для новых записей
                 } else {
                     idea
                 }
@@ -543,6 +546,11 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { false }
     }
 
+    /**
+     * Обновляет существующую идею.
+     * @param idea Объект идеи для обновления.
+     * @return true, если операция выполнена успешно, иначе false.
+     */
     suspend fun updateIdea(idea: Idea): Boolean {
         if (idea.id == null || idea.userId == null) {
             return false
@@ -568,6 +576,12 @@ class SupabaseHelper(private val context: Context) {
         }.getOrElse { false }
     }
 
+    /**
+     * Получает идею по ID.
+     * @param ideaId ID идеи.
+     * @param userId ID пользователя.
+     * @return Объект идеи или null, если не найдена.
+     */
     suspend fun getIdeaById(ideaId: Int, userId: String): Idea? {
         return try {
             client.postgrest.from("ideas")
