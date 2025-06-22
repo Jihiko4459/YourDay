@@ -125,8 +125,13 @@ fun IdeaDetailScreen(
     // Fields for editing
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var date by remember {
+    // For internal storage (yyyy-MM-dd)
+    var internalDate by remember {
         mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
+    }
+    // For display (dd.MM.yyyy)
+    var displayDate by remember(internalDate) {
+        mutableStateOf(formatDateForDisplay(internalDate))
     }
 
     LaunchedEffect(ideaId) {
@@ -139,7 +144,7 @@ fun IdeaDetailScreen(
                 idea?.let {
                     title = it.title ?: ""
                     description = it.description ?: ""
-                    date = it.date ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    internalDate = it.date ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 }
                 isLoading = false
             } catch (e: Exception) {
@@ -242,7 +247,7 @@ fun IdeaDetailScreen(
                                     userId = userId,
                                     title = title,
                                     description = description,
-                                    date = date
+                                    date = internalDate
                                 )
 
                                 CoroutineScope(Dispatchers.IO).launch {
@@ -328,7 +333,7 @@ fun IdeaDetailScreen(
                     }
 
                     Text(
-                        text = "Дата: ${idea?.date ?: ""}",
+                        text = "Дата: ${formatDateForDisplay(idea?.date ?: "")}",
                         style = TextStyle(
                             fontSize = 14.sp,
                             fontFamily = FontFamily(Font(R.font.roboto_regular)),
@@ -394,8 +399,8 @@ fun IdeaDetailScreen(
                     )
 
                     OutlinedTextField(
-                        value = date,
-                        onValueChange = { date = it },
+                        value = displayDate,
+                        onValueChange = { displayDate = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("yyyy-MM-dd") },
                         singleLine = true,
@@ -408,5 +413,25 @@ fun IdeaDetailScreen(
                 }
             }
         }
+    }
+}
+private val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+private val displayDateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+
+private fun formatDateForDisplay(dateString: String): String {
+    return try {
+        val date = inputDateFormat.parse(dateString)
+        displayDateFormat.format(date)
+    } catch (e: Exception) {
+        dateString
+    }
+}
+
+private fun formatDateForStorage(dateString: String): String {
+    return try {
+        val date = displayDateFormat.parse(dateString)
+        inputDateFormat.format(date)
+    } catch (e: Exception) {
+        dateString
     }
 }
